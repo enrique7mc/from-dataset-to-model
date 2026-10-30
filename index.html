@@ -730,7 +730,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 
 <!-- 13 · Cost at scale -->
 <section class="slide" id="slide-13" data-phase="model">
-  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Free doesn't scale.</h2><p class="sub">On this problem, a Gemini 3 model has reached 0.95+ precision and recall in my own work. Accuracy is not the issue. The bill for a whole catalog is.</p></header>
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Free doesn't scale.</h2><p class="sub">On this problem, a Gemini 3 model has reached 0.95+ precision and recall in similar tasks. Accuracy is not the issue. The bill for a whole catalog is.</p></header>
   <div class="s-body">
     <div class="stack">
       <div class="hgroup cost" data-step="1"><h4>Cost to score 100M images<small>log scale · batch prices · Gemini tokens estimated</small></h4><div class="hbars"><div class="hbar" style="--v:.976"><span>Gemini 3.1 Pro</span><div class="track"><div class="fill"></div></div><span class="num">$760k</span></div><div class="hbar" style="--v:.856"><span>Gemini 3 Flash</span><div class="track"><div class="fill"></div></div><span class="num">$190k</span></div><div class="hbar" style="--v:.627"><span>pilot VLM, full</span><div class="track"><div class="fill"></div></div><span class="num">$14k</span></div><div class="hbar" style="--v:.509"><span>pilot VLM, yes/no</span><div class="track"><div class="fill"></div></div><span class="num">$3.5k</span></div><div class="hbar hi" style="--v:.14"><span>own YOLOv8n</span><div class="track"><div class="fill"></div></div><span class="num">~$50</span></div></div></div>
@@ -739,7 +739,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     </div>
     <div class="who">
       <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Read token counts from the pilot's 53 cached calls, then sent the 36 images a single yes/no question: 838 tokens, $0.000035 each.</p></div>
-      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Sets the budget and the unsure band on validation. A confident miss never escalates: the yes/no call put 3 of 13 overlays below 0.05.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Sets the budget and decides when to escalate missed examples.</p></div>
       <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Every escalated image comes back labeled and joins the next training lap. The tail shrinks.</p></div>
     </div>
   </div>
@@ -762,7 +762,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
         <div class="r"><span>dataset manifest</span><span>4398…</span></div>
         <div class="r"><span>metrics.json · results.csv</span><span>saved</span></div>
         <div class="r"><span>console.log</span><span>saved</span></div>
-        <div class="tot">thank you · overwrite refused</div>
+        <div class="tot">overwrite refused</div>
       </div>
     </div>
     <div class="who">
@@ -822,7 +822,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     </div>
     <div class="who">
       <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Exports every error with ground truth beside prediction, sorted into buckets: small overlay, graphic only, transparent, over product, physical-text false positive.</p></div>
-      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Open the folders. A bucket is a hint, not a diagnosis.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Look at the error images yourself. A bucket says where to look, not why the model failed.</p></div>
       <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The bucket counts become the next hypothesis list.</p></div>
     </div>
   </div>
