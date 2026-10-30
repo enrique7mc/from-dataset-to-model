@@ -708,7 +708,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 
 <!-- 12 · Foundation model -->
 <section class="slide" id="slide-12" data-phase="model">
-  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Check what a foundation model gives you for free.</h2></header>
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Check what a foundation model gives you for free.</h2><p class="sub">A vision-language model reads an image and answers in text. Before paying for labels and training, ask one to find the overlays with no training at all.</p></header>
   <div class="s-body">
     <div class="stack">
       <div class="hgroup" data-step="1"><h4>Overlay presence<small>per image · 36 real photos · zero-shot VLM</small></h4><div class="hbars"><div class="hbar" style="--v:.90"><span>precision</span><div class="track"><div class="fill"></div></div><span class="num">90%</span></div><div class="hbar" style="--v:.69"><span>recall</span><div class="track"><div class="fill"></div></div><span class="num">69%</span></div></div></div>
@@ -717,12 +717,12 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
       <div class="takeaway" data-step="4">Presence is nearly free. <em>Localization needs training.</em></div>
     </div>
     <div class="who">
-      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built the pilot in a day: frozen sample, cached API calls, a grading page, metrics with human and model references kept apart.</p></div>
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built the pilot in a day: frozen sample, cached VLM requests, a grading page, metrics with human and model references kept apart.</p></div>
       <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Graded 36 images. Noticed the OCR text was bad. The agent wrote that down as a limitation of the whole result, not a footnote.</p></div>
       <div class="role auto" data-step="4"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Same images, same grading file, any model. Rerun the comparison when a new model ships.</p></div>
     </div>
   </div>
-  <aside class="notes"><p><b>A detour worth taking.</b> Before investing in training data, ask a hosted vision-language model to do the task zero-shot on a small, deliberately enriched real sample. The agent built the whole pilot: sampling with provenance, cached requests so a rerun costs nothing, an interactive grading report, and separate metrics for human versus model references.</p><p><b>The result shaped the plan.</b> Image-level presence was decent out of the box. Typed boxes were near zero. So the trained detector is for localization and type, and a foundation model could serve as a cheap presence pre-filter or a pre-labeler.</p><p><b>Human judgment again.</b> I graded the sample and reported that the OCR transcriptions were poor. The agent recorded that as a material limitation and listed the controlled follow-up it would take to separate transcription errors from classification errors. It did not run that follow-up on its own.</p></aside>
+  <aside class="notes"><p><b>A detour worth taking.</b> Before investing in training data, ask a hosted vision-language model to do the task zero-shot on a small, deliberately enriched real sample, to see whether training is needed at all. The agent built the whole pilot: sampling with provenance, cached requests so a rerun costs nothing, an interactive grading report, and separate metrics for human versus model references.</p><p><b>The result shaped the plan.</b> Image-level presence was decent out of the box. Typed boxes were near zero. So the trained detector is for localization and type, and a foundation model could serve as a cheap presence pre-filter or a pre-labeler.</p><p><b>Human judgment again.</b> I graded the sample and reported that the OCR transcriptions were poor. The agent recorded that as a material limitation and listed the controlled follow-up it would take to separate transcription errors from classification errors. It did not run that follow-up on its own.</p></aside>
 </section>
 
 <!-- 13 · Reproducible -->
