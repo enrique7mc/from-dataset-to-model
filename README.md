@@ -13,8 +13,19 @@ Open `index.html` in Chrome, Safari or Firefox. Press `F` for fullscreen.
 | `←` `Backspace` | previous build or slide |
 | `Home` / `End` | first / last slide |
 | `N` | toggle the speaker-notes panel (remembered between loads) |
+| `P` | open the presenter view in a second window |
 | `F` | fullscreen |
 | `?` | key help |
+
+### Presenter view
+
+Press `P` to open a second window with the current build, the next build or slide,
+the speaker notes, an elapsed timer (click it to restart) and the clock. Put that
+window on your laptop screen and the deck on the projector (extended display, not
+mirrored), then press `F` in the deck window. Arrow keys, Space and clickers work in
+either window and keep both in step; give the presenter window focus so the clicker
+drives it. The browser has to allow pop-ups for the page. While the presenter view is
+open, and in fullscreen, the published copy hides its Edit button.
 
 Click or tap the right 80 % of the screen to advance, the left 20 % to go back.
 Swipe works on touch screens. The URL hash (`#slide-7`) tracks the current slide,

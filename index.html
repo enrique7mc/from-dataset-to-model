@@ -301,6 +301,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 #edit-bar button:disabled{opacity:.45;cursor:default}
 #edit-bar .msg{padding:0 8px;white-space:nowrap}
 #edit-bar .msg:empty{display:none}
+body.presenting:not(.editing) #edit-bar,:root:fullscreen body:not(.editing) #edit-bar{display:none}
 :focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.loop .mover{display:none}}
 </style>
@@ -952,7 +953,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 </div>
 <div id="bar"></div>
 <div id="counter">1 / 22</div>
-<div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>E</kbd> edit text (published copy)<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
+<div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>P</kbd> presenter view (second window)<br><kbd>F</kbd> fullscreen<br><kbd>E</kbd> edit text (published copy)<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
 </div></div>
 <div id="notes" hidden></div>
 
@@ -1026,6 +1027,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   const apply = (s, n) => {
     s.querySelectorAll('[data-step]').forEach(e => { const k = +e.dataset.step; e.classList.toggle('shown', k <= n); e.classList.toggle('now', k === n); });
     runCounters(s);
+    syncPresenter();
   };
 
   const show = (n, st) => {
@@ -1056,15 +1058,95 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     else { const p = d.requestFullscreen?.(); if (p && p.catch) p.catch(() => {}); }
   };
 
+  const first = () => show(0, 0), last = () => show(total - 1, maxStep(slides[total - 1]));
+  const NAV = { ArrowRight: next, ArrowDown: next, ' ': next, PageDown: next, Enter: next, ArrowLeft: prev, ArrowUp: prev, PageUp: prev, Backspace: prev, Home: first, End: last };
+
+  // Presenter view: a second window this page builds and drives, with the current and next build, the notes and a timer.
+  // Keys pressed there (or a clicker focused on it) move this window. It needs pop-ups allowed.
+  const PV_CSS = `
+body.pv{height:100%;overflow:auto;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:14px;padding:14px 18px 18px}
+.pv-top{display:flex;align-items:center;gap:24px;font:400 18px var(--mono);color:var(--muted)}
+.pv-top b{font:400 32px/1 var(--display);color:var(--fg);letter-spacing:.02em}
+#pv-timer{font:600 30px/1 var(--mono);color:var(--yellow);background:none;border:1px solid var(--line);border-radius:10px;padding:6px 14px;cursor:pointer}
+#pv-clock{margin-left:auto}
+.pv-row{display:grid;grid-template-columns:3fr 2fr;gap:16px;align-items:start}
+.pv-lbl{font:700 13px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.pv-frame{position:relative;aspect-ratio:16/9;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+.pv-frame .stage{left:0;top:0;transform-origin:0 0}
+#pv-notes{overflow:auto;background:#0d1019;border:1px solid var(--line);border-radius:10px;padding:16px 20px;font:400 21px/1.5 var(--body);color:var(--fg-2)}
+#pv-notes p{margin:0 0 12px}
+#pv-notes b{color:var(--yellow)}
+body.pv *,body.pv *::before,body.pv *::after{animation-duration:.01ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:0s!important;transition-delay:0s!important}`;
+  let pw = null, pv = null, pvSlide = -1, t0 = 0, tick = 0;
+  const flash = t => { counter.textContent = t; setTimeout(() => { counter.textContent = `${cur + 1} / ${total}`; }, 3000); };
+  const elapsed = () => { const s = Math.floor((Date.now() - t0) / 1000), p = n => String(n).padStart(2, '0'); return (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p(Math.floor(s / 60) % 60) + ':' + p(s % 60); };
+  const snapshot = (n, st) => {
+    const s = slides[n].cloneNode(true);
+    s.removeAttribute('id'); s.classList.add('active'); s.classList.remove('past');
+    s.querySelectorAll('[contenteditable]').forEach(e => e.removeAttribute('contenteditable'));
+    s.querySelectorAll('[data-step]').forEach(e => { const k = +e.dataset.step; e.classList.toggle('shown', k <= st); e.classList.toggle('now', k === st); });
+    s.querySelectorAll('[data-count]').forEach(e => { if (e.closest('[data-step]')?.classList.contains('shown')) e.textContent = (+e.dataset.count).toLocaleString(); });
+    return s;
+  };
+  const closePresenter = () => {
+    clearInterval(tick); pw = pv = null; pvSlide = -1;
+    document.body.classList.remove('presenting');
+  };
+  const syncPresenter = () => {
+    if (!pv) return;
+    if (pw.closed) { closePresenter(); return; }
+    const end = maxStep(slides[cur]);
+    const [nn, ns, label] = step < end ? [cur, step + 1, 'Next build'] : cur < total - 1 ? [cur + 1, 0, 'Next slide'] : [-1, 0, 'End of deck'];
+    pv.now.replaceChildren(snapshot(cur, step));
+    pv.next.replaceChildren(...(nn < 0 ? [] : [snapshot(nn, ns)]));
+    pv.nextLbl.textContent = label;
+    pv.count.textContent = `${cur + 1} / ${total}`;
+    if (pvSlide !== cur) { pv.notes.innerHTML = slides[cur].querySelector('.notes')?.innerHTML || '<p>No notes for this slide.</p>'; pv.notes.scrollTop = 0; pvSlide = cur; }
+  };
+  const openPresenter = () => {
+    if (pw && !pw.closed) { pw.focus(); return; }
+    const w = window.open('', 'deck-presenter', 'popup,width=1280,height=800');
+    let doc = null; try { doc = w && w.document; } catch (_) {}
+    if (!doc) { try { w?.close(); } catch (_) {} flash('Presenter view blocked: allow pop-ups'); return; }
+    const fonts = document.querySelector('link[href*="fonts.googleapis.com/css"]')?.outerHTML || '';
+    const defs = document.querySelector('body > svg')?.outerHTML || '';
+    const base = location.href.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+    doc.open();
+    doc.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><base href="${base}"><title>Presenter · ${document.title}</title>${fonts}<style>${document.getElementById('deck-css').textContent}${PV_CSS}</style></head>`
+      + `<body class="pv">${defs}<header class="pv-top"><b id="pv-count"></b><button type="button" id="pv-timer" title="Click to restart the timer">00:00</button><span id="pv-clock"></span></header>`
+      + '<div class="pv-row"><div><div class="pv-lbl">Now</div><div class="pv-frame"><div class="stage" id="pv-now"></div></div></div>'
+      + '<div><div class="pv-lbl" id="pv-next-lbl"></div><div class="pv-frame"><div class="stage" id="pv-next"></div></div></div></div>'
+      + '<div id="pv-notes"></div></body></html>');
+    doc.close();
+    const $ = id => doc.getElementById(id);
+    pw = w; pv = { now: $('pv-now'), next: $('pv-next'), nextLbl: $('pv-next-lbl'), count: $('pv-count'), notes: $('pv-notes') };
+    const fitPv = () => doc.querySelectorAll('.pv-frame').forEach(f => { f.firstElementChild.style.transform = `scale(${f.clientWidth / 1600})`; });
+    w.addEventListener('resize', fitPv);
+    w.addEventListener('keydown', e => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const go = NAV[e.key]; if (go) { e.preventDefault(); go(); }
+    });
+    $('pv-timer').addEventListener('click', () => { t0 = Date.now(); $('pv-timer').textContent = elapsed(); });
+    t0 = Date.now();
+    tick = setInterval(() => {
+      if (pw.closed) { closePresenter(); return; }
+      $('pv-timer').textContent = elapsed();
+      $('pv-clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }, 1000);
+    $('pv-clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!notesPanel.hidden) toggleNotes();
+    document.body.classList.add('presenting');
+    syncPresenter(); fitPv(); w.focus();
+  };
+  addEventListener('pagehide', () => { if (pw && !pw.closed) pw.close(); });
+
   addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target.isContentEditable || e.target.closest?.('#edit-bar')) return;
+    const go = NAV[e.key]; if (go) { e.preventDefault(); go(); return; }
     switch (e.key) {
-      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': case 'Enter': e.preventDefault(); next(); break;
-      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace': e.preventDefault(); prev(); break;
-      case 'Home': e.preventDefault(); show(0, 0); break;
-      case 'End': e.preventDefault(); show(total - 1, maxStep(slides[total - 1])); break;
       case 'n': case 'N': toggleNotes(); break;
+      case 'p': case 'P': openPresenter(); break;
       case 'f': case 'F': toggleFull(); break;
       case '?': case 'h': case 'H': help.hidden = !help.hidden; break;
       case 'Escape': help.hidden = true; break;
