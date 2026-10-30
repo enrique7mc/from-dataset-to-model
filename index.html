@@ -768,7 +768,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     <div class="who">
       <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Did all of this because one line in AGENTS.md asked for provenance. Nobody specified the list.</p></div>
       <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Datasets and runs refuse to overwrite. Replay verifies pixels. Gates verify hashes.</p></div>
-      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Can trust a number three weeks later. Can also admit the GPU is not bit-deterministic.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Trusts a result weeks later, and knows a seed doesn't guarantee identical weights on GPU.</p></div>
     </div>
   </div>
   <aside class="notes"><p><b>Provenance by default.</b> Every training run saves its config, seed, git commit and uncommitted diff, hashes of every source file, the lockfile, the initial weights, and the dataset manifest, next to the metrics and logs. New output names are required; an existing run directory is never overwritten.</p><p><b>Why this is an agent strength.</b> Humans skip this because it is tedious. The agent does not get bored. One sentence in the rules file bought the whole receipt.</p><p><b>The honest caveat</b> it also wrote: on Apple MPS some kernels are nondeterministic, so a recorded seed does not promise bit-identical weights.</p></aside>
