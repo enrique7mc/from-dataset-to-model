@@ -341,7 +341,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     <div>
       <span class="kicker">Claude Code Meetup</span>
       <h1>From dataset <em>to model</em></h1>
-      <p class="sub">ML development with coding agents, told as one engineer's week.</p>
+      <p class="sub">ML development with coding agents</p>
       <p class="by">Enrique Munguía · 30/10/2026</p>
       <p class="keys"><kbd>→</kbd> next &nbsp; <kbd>←</kbd> back &nbsp; <kbd>N</kbd> notes &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>?</kbd> help</p>
     </div>
@@ -351,7 +351,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 
 <!-- 2 · The task -->
 <section class="slide" id="slide-2">
-  <header class="s-head"><span class="kicker">The task</span><h2>Find the overlays.</h2></header>
+  <header class="s-head"><span class="kicker">The task</span><h2>Find the overlays on a product image</h2></header>
   <div class="s-body">
     <div class="fig">
       <svg class="ill" viewBox="0 0 960 600" aria-label="A product photo of a mug. Five kinds of digital overlay appear one by one, each with a labeled bounding box.">
@@ -491,7 +491,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
       <div class="agentline" data-step="3"><b>agent ›</b> Inspected sheet 000: digitally composited feature text and dimension arrows occur alongside printed product branding. Source review is necessary before any image feeds generation.</div>
     </div>
     <div class="who">
-      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Found Amazon Berkeley Objects. Wrote the downloader: safe to rerun, every file verified.</p></div>
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Found Amazon Berkeley Objects. Wrote the downloader and verified all the files.</p></div>
       <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Review sheets for every batch. Same seed, same 1,000 images, every run.</p></div>
       <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Look at the sheets. Decide whether this data is the problem you are solving.</p></div>
     </div>
@@ -541,10 +541,10 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
           </g>
         </g>
       </svg>
-      <div class="sheet" data-step="3"><img src="assets/synthetic_contact_sheet.jpg" alt="A 25-image contact sheet of synthetic overlays on illustrated products, with labeled boxes."><svg viewBox="0 0 960 600" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true"><g transform="rotate(-12 700 160)"><rect x="520" y="110" width="360" height="100" rx="10" fill="none" stroke="#ffcf32" stroke-width="5"/><text x="700" y="178" text-anchor="middle" class="stamp fill" font-size="54">LOOKS GOOD ✓</text></g></svg><div class="tagline"><b>Gate 1</b> · 100 images, 128 boxes, 20 negatives · the agent waited</div></div>
+      <div class="sheet" data-step="3"><img src="assets/synthetic_contact_sheet.jpg" alt="A 25-image contact sheet of synthetic overlays on product photos, with labeled boxes."><svg viewBox="0 0 960 600" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true"><g transform="rotate(-12 700 160)"><rect x="520" y="110" width="360" height="100" rx="10" fill="none" stroke="#ffcf32" stroke-width="5"/><text x="700" y="178" text-anchor="middle" class="stamp fill" font-size="54">LOOKS GOOD ✓</text></g></svg><div class="tagline"><b>Gate 1</b> · 100 images, 128 boxes, 20 negatives · the agent waited</div></div>
     </div>
     <div class="who">
-      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built a generator for all five classes: shapes, fonts, placement, opacity, occlusion, clipped boxes, COCO export. 108 tests.</p></div>
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built a generator for all five classes: shapes, fonts, placement, opacity, occlusion, clipped boxes. 108 tests.</p></div>
       <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Every image is replayable from its record. A single box with bad coordinates, like zero size or a box outside the image, fails validation for the whole dataset.</p></div>
       <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Look at the contact sheet. <q>Bad synthetic data makes the experiment look successful while teaching the wrong problem.</q></p></div>
     </div>

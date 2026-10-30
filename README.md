@@ -67,7 +67,11 @@ Fonts load from Google Fonts first and fall back to the local files when offline
 
 `prod-*.webp` are product photos generated with Gemini (`gemini-3-pro-image-preview`),
 color-matched to the `#faf7ef` panel and feathered at the edges. The SVG overlays and boxes
-sit on top of them. `false_negative.jpg` (slide 15) is a re-render of the evaluator's
+sit on top of them. `prod-oats`, `prod-kettle` and `prod-tshirt` were added later the same
+way to complete the product set. `synthetic_contact_sheet.jpg` (slide 7) is a re-render: the
+`overlay` project's real generator (`scripts/generate_synthetic.py`, default config, seed 42,
+100 samples) run over the eight `prod-*` photos in place of the original illustrated fixtures.
+`false_negative.jpg` (slide 15) is a re-render of the evaluator's
 error image built from `prod-shoe` with the same composited watermark.
 
 The ABO review sheet shows images from Amazon Berkeley Objects (CC BY 4.0,
