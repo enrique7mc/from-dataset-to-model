@@ -191,6 +191,9 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
 .hgroup h4{margin:0 0 10px;font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2)}
 .hgroup h4 small{margin-left:10px;font:400 14px var(--body);letter-spacing:0;text-transform:none;color:var(--muted)}
 .hgroup .hbar{grid-template-columns:110px 1fr 70px}
+.hgroup.cost .hbar{grid-template-columns:200px 1fr 80px}
+.hbar.hi .fill{background:var(--yellow)}
+.hgroup.tier .fill{min-width:4px}
 .evalgrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;align-content:start;gap:16px;min-height:0}
 .evalgrid .tiles4{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .evalgrid .stat b{font-size:50px}
@@ -725,8 +728,26 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>A detour worth taking.</b> Before investing in training data, ask a hosted vision-language model to do the task zero-shot on a small, deliberately enriched real sample, to see whether training is needed at all. The agent built the whole pilot: sampling with provenance, cached requests so a rerun costs nothing, an interactive grading report, and separate metrics for human versus model references.</p><p><b>The result shaped the plan.</b> Image-level presence was decent out of the box. Typed boxes were near zero. So the trained detector is for localization and type, and a foundation model could serve as a cheap presence pre-filter or a pre-labeler.</p><p><b>Human judgment again.</b> I graded the sample and reported that the OCR transcriptions were poor. The agent recorded that as a material limitation and listed the controlled follow-up it would take to separate transcription errors from classification errors. It did not run that follow-up on its own.</p></aside>
 </section>
 
-<!-- 13 · Reproducible -->
+<!-- 13 · Cost at scale -->
 <section class="slide" id="slide-13" data-phase="model">
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Free doesn't scale.</h2><p class="sub">On this problem, a Gemini 3 model has reached 0.95+ precision and recall in my own work. Accuracy is not the issue. The bill for a whole catalog is.</p></header>
+  <div class="s-body">
+    <div class="stack">
+      <div class="hgroup cost" data-step="1"><h4>Cost to score 100M images<small>log scale · batch prices · Gemini tokens estimated</small></h4><div class="hbars"><div class="hbar" style="--v:.976"><span>Gemini 3.1 Pro</span><div class="track"><div class="fill"></div></div><span class="num">$760k</span></div><div class="hbar" style="--v:.856"><span>Gemini 3 Flash</span><div class="track"><div class="fill"></div></div><span class="num">$190k</span></div><div class="hbar" style="--v:.627"><span>pilot VLM, full</span><div class="track"><div class="fill"></div></div><span class="num">$14k</span></div><div class="hbar" style="--v:.509"><span>pilot VLM, yes/no</span><div class="track"><div class="fill"></div></div><span class="num">$3.5k</span></div><div class="hbar hi" style="--v:.14"><span>own YOLOv8n</span><div class="track"><div class="fill"></div></div><span class="num">~$50</span></div></div></div>
+      <div class="hgroup cost tier" data-step="2"><h4>Tiered · 100M images<small>share of images · routed by confidence · ≈ $23k total</small></h4><div class="hbars"><div class="hbar hi" style="--v:1"><span>own detector</span><div class="track"><div class="fill"></div></div><span class="num">100%</span></div><div class="hbar" style="--v:.03"><span>Gemini 3.1 Pro</span><div class="track"><div class="fill"></div></div><span class="num">3%</span></div><div class="hbar muted" style="--v:.0005"><span>human review</span><div class="track"><div class="fill"></div></div><span class="num">0.05%</span></div></div></div>
+      <div class="takeaway" data-step="3">Own the bulk. <em>Rent the hard tail.</em></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Read token counts from the pilot's 53 cached calls, then sent the 36 images a single yes/no question: 838 tokens, $0.000035 each.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Sets the budget and the unsure band on validation. A confident miss never escalates: the yes/no call put 3 of 13 overlays below 0.05.</p></div>
+      <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Every escalated image comes back labeled and joins the next training lap. The tail shrinks.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The tradeoff.</b> In production work on this exact problem, a Gemini 3 family model gave me precision and recall above 0.95. That is better than anything trained here so far. But a hosted model is a per-image bill, every time the catalog is re-scored, while your own detector is mostly a fixed cost: labels, engineering time, a training run. At tens or hundreds of millions of images the per-image line wins the argument.</p><p><b>Where the numbers come from.</b> The pilot VLM rows use measured tokens: 3,265 input tokens for the full slide-12 prompt, and 838 for a yes/no presence question the agent sent to the same 36 images, at $0.042 per million input tokens with free output. Gemini rows are estimates at batch prices from the October 2026 price page: about 1,600 input tokens per image (1,120 for the image at default resolution plus the prompt) and about 1,000 output tokens including thinking. Thinking is the big unknown; measure it before quoting. The YOLOv8n line assumes roughly 500 images per second on one rented L4.</p><p><b>The tiered answer.</b> Run your own detector on everything. Send only the unsure band, a few percent, to the expensive model, and the leftovers to a person. Every escalation becomes a label, so the next model needs fewer. Three percent of 100M at Pro batch prices is about $23k instead of $760k, and the hard tail still gets the 0.95 model.</p><p><b>The catch.</b> A cascade cannot fix confident mistakes. On the yes/no run, every score above 0.6 was a real overlay, but three of the thirteen overlays scored under 0.05 and would never have been escalated. Tune the routing thresholds on validation and measure the whole cascade, not each tier alone.</p></aside>
+</section>
+
+<!-- 14 · Reproducible -->
+<section class="slide" id="slide-14" data-phase="model">
   <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Every run remembers how it was made.</h2></header>
   <div class="s-body">
     <div class="fig" style="display:grid">
@@ -753,8 +774,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>Provenance by default.</b> Every training run saves its config, seed, git commit and uncommitted diff, hashes of every source file, the lockfile, the initial weights, and the dataset manifest, next to the metrics and logs. New output names are required; an existing run directory is never overwritten.</p><p><b>Why this is an agent strength.</b> Humans skip this because it is tedious. The agent does not get bored. One sentence in the rules file bought the whole receipt.</p><p><b>The honest caveat</b> it also wrote: on Apple MPS some kernels are nondeterministic, so a recorded seed does not promise bit-identical weights.</p></aside>
 </section>
 
-<!-- 14 · Numbers first -->
-<section class="slide" id="slide-14" data-phase="eval">
+<!-- 15 · Numbers first -->
+<section class="slide" id="slide-15" data-phase="eval">
   <header class="s-head"><span class="kicker">Running eval</span><h2>Numbers first.</h2></header>
   <div class="s-body">
     <div class="evalgrid">
@@ -787,8 +808,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>The numbers are bad, and that is fine.</b> This is a 20-epoch baseline on illustrated fixtures, evaluated on 20 held-out images. Ranking AP is around 0.49 but at the fixed 0.25 confidence the detector finds one box out of eighteen and one positive image out of thirteen. Zero false positives on seven negatives.</p><p><b>What the agent did right</b> is in the labels around the numbers. The JSON has a field called synthetic_smoke set to true and real_evaluation set to false. The report explains why AP and fixed-threshold recall disagree, and it warns me not to tune the threshold on the test split. Missing classes return null, not an invented zero.</p><p><b>Human.</b> Which misses matter is a product question. A missed watermark and a missed "20% OFF" badge have very different costs in a catalog.</p></aside>
 </section>
 
-<!-- 15 · Look at the pictures -->
-<section class="slide" id="slide-15" data-phase="eval">
+<!-- 16 · Look at the pictures -->
+<section class="slide" id="slide-16" data-phase="eval">
   <header class="s-head"><span class="kicker">Running eval</span><h2>Then look at the pictures.</h2></header>
   <div class="s-body">
     <div class="fig">
@@ -808,8 +829,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>Error analysis you can see.</b> For every false negative and false positive the evaluator writes an image: ground truth on the left, prediction at the operating point on the right, into a folder named after the bucket. This one is a watermark on a sneaker that the baseline simply missed.</p><p><b>Buckets are aids, not explanations.</b> The agent's report says exactly that. The categorization uses heuristics like box size and the attributes you recorded when labeling. It tells you where to look, and then a person looks.</p></aside>
 </section>
 
-<!-- 16 · Close the loop -->
-<section class="slide" id="slide-16" data-phase="improve">
+<!-- 17 · Close the loop -->
+<section class="slide" id="slide-17" data-phase="improve">
   <header class="s-head"><span class="kicker">Improvement loops</span><h2>Close the loop.</h2></header>
   <div class="s-body">
     <div class="fig loop">
@@ -847,24 +868,24 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>The loop the agent can run.</b> Evaluate, read the error buckets, propose a hypothesis, change data or config, pass the overfit gate, train, evaluate again. Each lap produces a run directory with full provenance and a report.</p><p><b>Where the human sits.</b> Approving the hypothesis before compute is spent, looking at any new synthetic data, and deciding when the model is good enough or when to stop. These are the yellow diamonds.</p><p><b>The guardrails</b> are what make unattended laps safe: the gate, the leakage checks, the rule that synthetic numbers never get reported as real, and run directories that refuse to overwrite.</p><p><b>Where this project stands.</b> The 294 clean sources are reviewed, the 92 evaluation images are labeled, and the real-data lap has not been run yet. That is the next session.</p></aside>
 </section>
 
-<!-- 17 · Framework -->
-<section class="slide" id="slide-17">
+<!-- 18 · Framework -->
+<section class="slide" id="slide-18">
   <header class="s-head"><span class="kicker">Takeaway</span><h2>Who does what, station by station.</h2></header>
   <div class="s-body one">
     <div class="matrix">
       <div class="h"></div><div class="h agent">Agent</div><div class="h human">Human</div><div class="h auto">Automate</div>
       <div class="row"><div class="ph">EXPLORE</div><div class="cell agent">finds sources, writes downloaders, builds contact sheets, flags what it sees</div><div class="cell human">defines the ontology and the negatives, looks at the sheets</div><div class="cell auto">seeded sampling, checksums, review sheets per batch</div></div>
-      <div class="row"><div class="ph">LABEL</div><div class="cell agent">builds the labeling tool, tests it in a real browser, reads the live state</div><div class="cell human">draws the boxes, decides the hard negatives</div><div class="cell auto">pre-labels, group reservations, model judges in a separate cohort</div></div>
+      <div class="row"><div class="ph">LABEL</div><div class="cell agent">builds the labeling tool, tests it in a real browser, reads the live state</div><div class="cell human">provides precise labels, disambiguates hard cases</div><div class="cell auto">pre-labels, group reservations, model judges in a separate cohort</div></div>
       <div class="row"><div class="ph">MODEL</div><div class="cell agent">conversion, grouped splits, training scripts, provenance, zero-shot pilots</div><div class="cell human">picks the boring baseline, sets gate thresholds</div><div class="cell auto">overfit gate, run folders that refuse to overwrite</div></div>
-      <div class="row"><div class="ph">EVAL</div><div class="cell agent">metrics, error buckets, ground truth beside prediction, honest labels on results</div><div class="cell human">chooses the operating point, decides which misses cost money</div><div class="cell auto">held-out splits, leakage checks, null instead of invented numbers</div></div>
+      <div class="row"><div class="ph">EVAL</div><div class="cell agent">metrics, error buckets, ground truth beside prediction, honest labels on results</div><div class="cell human">chooses the business targets, decides which misses cost money</div><div class="cell auto">held-out splits, leakage checks, null instead of invented numbers</div></div>
       <div class="row"><div class="ph">IMPROVE</div><div class="cell agent">hypothesis, change, retrain, report</div><div class="cell human">approves hypotheses, owns the stop condition</div><div class="cell auto">overnight laps inside the guardrails, morning report</div></div>
     </div>
   </div>
   <aside class="notes"><p><b>The framework in one table.</b> Read it by column. The agent column is mostly building and running. The human column is mostly defining and judging. The automate column is what you get once the rules from the human column are written down and the tooling from the agent column exists.</p><p>If you take one thing home: every human cell is a sentence you can write into a plan file before the agent starts.</p></aside>
 </section>
 
-<!-- 18 · Three habits -->
-<section class="slide" id="slide-18">
+<!-- 19 · Three habits -->
+<section class="slide" id="slide-19">
   <header class="s-head"><span class="kicker">Takeaway</span><h2>Three habits that made it work.</h2></header>
   <div class="s-body one">
     <div class="habits">
@@ -876,8 +897,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>Rules.</b> AGENTS.md is about twenty lines. The lines that did the most work were the prohibitions: do not fabricate, do not treat uncertain as clean, do not scale before the overfit test.</p><p><b>Gates.</b> Milestone one ended with a contact sheet I had to approve. Milestone three ended with a numeric gate the code enforces. Milestone four ends with fifty reviewed real images, and the exporter counts them.</p><p><b>Handoffs.</b> Long projects outlive any single session. The handoff section in PLAN.md is rewritten at the end of every session with current counts and the next command to run. The next session starts there, with no memory needed.</p></aside>
 </section>
 
-<!-- 19 · Where it breaks -->
-<section class="slide" id="slide-19">
+<!-- 20 · Where it breaks -->
+<section class="slide" id="slide-20">
   <header class="s-head"><span class="kicker">Limitations</span><h2>Where delegation breaks.</h2></header>
   <div class="s-body one">
     <div class="cautions">
@@ -892,8 +913,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>Be honest about the limits.</b> The agent cannot tell you what good is. It over-builds unless you bound the scope. It does not see your data the way you do, which is why the contact sheets exist. It forgets between sessions, so handoffs matter. It is agreeable by default, so the prohibitions matter. And it can spend your GPU hours without noticing, so the gates and the tiny subsets matter.</p><p>None of these are reasons not to use it. They are the reasons the human column in the table is not empty.</p></aside>
 </section>
 
-<!-- 20 · Close -->
-<section class="slide close" id="slide-20">
+<!-- 21 · Close -->
+<section class="slide close" id="slide-21">
   <div class="s-body one">
     <div>
       <span class="kicker">Thank you</span>
@@ -906,7 +927,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 
 </div>
 <div id="bar"></div>
-<div id="counter">1 / 20</div>
+<div id="counter">1 / 21</div>
 <div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>E</kbd> edit text (published copy)<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
 </div></div>
 <div id="notes" hidden></div>
