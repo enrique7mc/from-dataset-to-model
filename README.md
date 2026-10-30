@@ -71,6 +71,8 @@ sit on top of them. `prod-oats`, `prod-kettle` and `prod-tshirt` were added late
 way to complete the product set. `synthetic_contact_sheet.jpg` (slide 7) is a re-render: the
 `overlay` project's real generator (`scripts/generate_synthetic.py`, default config, seed 42,
 100 samples) run over the eight `prod-*` photos in place of the original illustrated fixtures.
+`labeling_ui.png` (slide 8) is a fresh screenshot of the real labeling tool on an artificial
+fixture: sample 0000074 from that run (the kettle) with its three generated boxes loaded as a draft.
 `false_negative.jpg` (slide 15) is a re-render of the evaluator's
 error image built from `prod-shoe` with the same composited watermark.
 
