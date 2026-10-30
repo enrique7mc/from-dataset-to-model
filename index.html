@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- artifact:start -->
+<title>From Dataset to Model</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Lato:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: one fixed 1600x900 stage scaled to the viewport. One <section> per slide. [data-step] elements build in on each keypress. */
+@font-face{font-family:"Anton Local";src:url("assets/fonts/Anton-Regular.ttf") format("truetype");font-display:swap}
+@font-face{font-family:"Lato Local";src:url("assets/fonts/Lato-Regular.ttf") format("truetype");font-weight:400;font-display:swap}
+:root{
+  --bg:#131726; --bg-2:#1b2033; --bg-3:#242b42; --line:#2e3650;
+  --fg:#fff7d6; --fg-2:#d6d1bf; --muted:#8b90a6;
+  --yellow:#ffcf32; --red:#e5484d; --blue:#5b8def; --green:#2fb57c; --orange:#f08a3c;
+  --c-badge:#dd4b4b; --c-text:#4a87e8; --c-mark:#bf55a8; --c-ribbon:#2f9c67; --c-sticker:#cc7f1a;
+  --paper:#faf7ef; --paper-2:#efe9da; --ink:#1d2230; --ink-2:#5c6271;
+  --display:"Anton Local","Anton",Impact,"Arial Narrow Bold",sans-serif;
+  --body:"Lato","Lato Local","Helvetica Neue",Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);overflow:hidden}
+.deck{height:100%;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+.deck-inner{position:relative;height:100%;width:100%;overflow:hidden}
+.stage{position:absolute;left:50%;top:50%;width:1600px;height:900px;transform:translate(-50%,-50%);transform-origin:center;background:var(--bg)}
+body.with-notes .deck{height:calc(100% - 210px)}
+
+/* Slides */
+.slide{position:absolute;inset:0;padding:64px 80px 56px;display:flex;flex-direction:column;opacity:0;visibility:hidden;transform:translateX(28px);transition:opacity .45s ease,transform .45s ease,visibility 0s linear .45s}
+.slide.active{opacity:1;visibility:visible;transform:none;transition:opacity .45s ease,transform .45s ease,visibility 0s}
+.slide.past{transform:translateX(-28px)}
+.s-head{position:relative;flex:none}
+.kicker{display:inline-block;font:700 17px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--yellow);margin:0 0 14px}
+h1,h2{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;letter-spacing:.005em}
+h2{font-size:66px;line-height:1.02;max-width:1120px}
+.sub{font:400 26px/1.35 var(--body);color:var(--fg-2);margin:14px 0 0;max-width:1040px}
+.crumb{position:absolute;right:0;top:2px;display:flex;gap:6px;font:700 13px/1 var(--body);letter-spacing:.14em;text-transform:uppercase}
+.crumb span{padding:9px 13px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
+.crumb span.on{background:var(--yellow);border-color:var(--yellow);color:var(--ink)}
+.s-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:44px;margin-top:34px}
+.s-body.one{grid-template-columns:minmax(0,1fr)}
+.fig{position:relative;min-height:0;background:var(--bg-2);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.fig>svg.ill{position:absolute;inset:0;width:100%;height:100%}
+.fig .cap{position:absolute;left:18px;bottom:14px;font:400 15px var(--mono);color:var(--muted)}
+.who{display:flex;flex-direction:column;gap:14px;justify-content:center;min-width:0}
+.role{padding:16px 20px 16px 22px;background:var(--bg-2);border:1px solid var(--line);border-left-width:5px;border-radius:12px}
+.role .tag{display:inline-flex;align-items:center;gap:8px;font:700 13px/1 var(--body);letter-spacing:.16em;text-transform:uppercase}
+.role .tag svg{width:18px;height:18px}
+.role p{margin:8px 0 0;font:400 21px/1.32 var(--body);color:var(--fg)}
+.role p q{font-style:italic;color:var(--fg-2)}
+.role.agent{border-left-color:var(--blue)}.role.agent .tag{color:var(--blue)}
+.role.human{border-left-color:var(--yellow)}.role.human .tag{color:var(--yellow)}
+.role.auto{border-left-color:var(--green)}.role.auto .tag{color:var(--green)}
+
+/* Builds */
+[data-step]{opacity:0;transform:translateY(12px);transition:opacity .45s ease,transform .45s ease}
+[data-step].shown{opacity:1;transform:none}
+svg [data-step]{transform:none;transition:opacity .4s ease}
+.mark[data-step]{opacity:1;transform:none;transition:background .4s ease,color .4s ease}
+.mark[data-step].shown{background:var(--yellow);color:var(--ink)}
+svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box;transform-origin:center}
+.drop.shown,.slide.active .auto-drop{animation:drop .75s cubic-bezier(.2,.9,.3,1.25) both}
+.slide.active .auto-drop{animation-delay:.5s}
+@keyframes drop{from{opacity:0;transform:translateY(-150px) rotate(-18deg) scale(1.15)}to{opacity:1;transform:none}}
+.pop.shown,.slide.active .auto-pop{animation:pop .5s cubic-bezier(.2,.9,.3,1.4) both}
+@keyframes pop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+.bbox rect.b{fill:none;stroke:currentColor;stroke-width:3;stroke-dasharray:1;stroke-dashoffset:1}
+.bbox.shown rect.b,.slide.active .bbox.auto rect.b{animation:draw .7s ease .15s forwards}
+.slide.active .bbox.auto{opacity:1}
+.slide.active .bbox.auto.late rect.b{animation-delay:1.4s}
+.slide.active .bbox.auto.late .lbl{animation-delay:1.9s}
+.slide.active .bbox.auto .lbl{opacity:0;animation:fadein .3s ease .7s forwards}
+@keyframes fadein{to{opacity:1}}
+@keyframes draw{to{stroke-dashoffset:0}}
+.drag .draw{transform-box:fill-box;transform-origin:0 0;transform:scale(0)}
+.drag .cur{transform:translate(-164px,-106px)}
+.drag.shown .draw{animation:drag-box 1.1s ease-in-out .2s forwards}
+.drag.shown .cur{animation:drag-cur 1.1s ease-in-out .2s forwards}
+@keyframes drag-box{to{transform:scale(1)}}
+@keyframes drag-cur{to{transform:translate(0,0)}}
+.bbox rect.l{fill:currentColor}
+.bbox text{fill:#fff;font:600 14px var(--mono)}
+.c-badge{color:var(--c-badge)}.c-text{color:var(--c-text)}.c-mark{color:var(--c-mark)}.c-ribbon{color:var(--c-ribbon)}.c-sticker{color:var(--c-sticker)}
+.neg rect.b{fill:none;stroke:var(--green);stroke-width:3;stroke-dasharray:8 6}
+.neg rect.l{fill:var(--green)}
+.neg text{fill:#fff;font:600 13px var(--mono)}
+.stamp{font-family:var(--display);font-size:46px;letter-spacing:.04em;fill:none;stroke:var(--yellow);stroke-width:2.5;paint-order:stroke}
+.stamp.fill{fill:var(--yellow);stroke:none}
+.svgtext{font-family:var(--body)}
+.mono{font-family:var(--mono)}
+
+/* Cover */
+.cover .s-body{grid-template-columns:760px minmax(0,1fr);gap:60px;margin-top:0;align-items:center}
+.cover .fig{height:560px}
+.cover h1{font-size:118px;line-height:.98}
+.cover h1 em{font-style:normal;color:var(--yellow)}
+.cover .sub{font-size:30px;margin-top:22px}
+.cover .by{margin-top:38px;font:400 22px/1.4 var(--body);color:var(--muted)}
+.cover .keys{margin-top:44px;font:400 15px/1.8 var(--mono);color:var(--muted)}
+.cover .keys kbd{display:inline-block;min-width:26px;padding:1px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg-2);color:var(--fg-2);text-align:center}
+
+/* Class legend */
+.legend{display:flex;flex-direction:column;gap:12px;justify-content:center}
+.legend .goal{display:flex;gap:14px;margin-bottom:18px}
+.legend .goal span{flex:1;padding:14px 0;text-align:center;border:1px solid var(--line);border-radius:10px;font:400 26px var(--display);letter-spacing:.04em;color:var(--fg-2)}
+.legend .cls{display:flex;align-items:center;gap:14px;padding:12px 16px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;font:400 20px var(--mono)}
+.legend .cls i{width:16px;height:16px;border-radius:4px;background:currentColor;flex:none}
+.legend .cls small{margin-left:auto;font:400 15px var(--body);color:var(--muted)}
+
+/* Pipeline (slide: the loop) */
+.loopwrap{display:flex;flex-direction:column;gap:30px;justify-content:center;min-height:0}
+.pipe{width:100%;height:auto}
+.pipe .node rect{fill:var(--bg-2);stroke:var(--line);stroke-width:2;transition:fill .4s,stroke .4s}
+.pipe .node text{fill:var(--fg-2);font-family:var(--display);font-size:36px;letter-spacing:.03em;transition:fill .4s}
+.pipe .node.shown rect{fill:var(--yellow);stroke:var(--yellow)}
+.pipe .node.shown text{fill:var(--ink)}
+.pipe .node[data-step]{opacity:1}
+.pipe .arrow{stroke:var(--muted);stroke-width:3;fill:none;marker-end:url(#ah)}
+.pipe .ret{stroke:var(--green);stroke-width:3;fill:none;stroke-dasharray:10 8;marker-end:url(#ahg)}
+.legend3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.legend3 .role p{font-size:22px}
+
+/* Docs */
+.docs{display:grid;grid-template-columns:1fr 1fr;gap:22px;min-height:0}
+.doc{background:var(--paper);color:var(--ink);border-radius:14px;padding:20px 24px;font:400 16.5px/1.5 var(--mono);overflow:hidden}
+.doc h4{margin:0 0 10px;font:700 13px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+.doc .c{color:#8a6d1f}
+.doc .ln{display:block;padding:1px 6px;margin:0 -6px;border-radius:4px}
+.doc .dim{color:var(--ink-2)}
+
+/* Download grid */
+.tiles{position:absolute;inset:0;display:grid;grid-template-columns:repeat(24,1fr);grid-template-rows:repeat(10,1fr);gap:4px;padding:18px}
+.tiles i{display:block;border-radius:3px;background:var(--bg-3);opacity:.9}
+.tiles.shown i{animation:dl .5s ease var(--d) both}
+@keyframes dl{from{background:var(--bg-3)}to{background:hsl(var(--h) 28% var(--l))}}
+.tiles[data-step]{opacity:1;transform:none}
+.tiles .count{position:absolute;right:22px;bottom:16px;font:400 80px/1 var(--display);color:var(--fg);text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.tiles .count small{display:block;font:700 14px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--yellow)}
+.sheet{position:absolute;inset:0;background:var(--bg);transform:translateY(102%);transition:transform .6s cubic-bezier(.2,.8,.2,1),opacity .3s}
+.sheet.shown{transform:none}
+.sheet img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:top}
+.sheet .tagline{position:absolute;left:0;right:0;bottom:0;padding:12px 18px;background:rgba(19,23,38,.88);font:400 17px var(--mono);color:var(--fg-2)}
+.sheet .tagline b{color:var(--yellow);font-weight:600}
+.agentline{position:absolute;left:18px;right:18px;top:18px;padding:12px 16px;background:rgba(13,16,25,.92);border:1px solid var(--line);border-left:5px solid var(--blue);border-radius:10px;font:400 17px/1.45 var(--mono);color:#c8d0e0}
+.agentline b{color:var(--blue);font-weight:600}
+
+/* Terminal */
+.term{background:#0d1019;border:1px solid var(--line);border-radius:14px;padding:22px 26px;font:400 19px/1.65 var(--mono);color:#c8d0e0}
+.term .p{color:var(--green)}
+.term .err{color:var(--red)}
+.term .dim{color:var(--muted)}
+.term .ok{color:var(--yellow)}
+.stack{display:flex;flex-direction:column;gap:20px;justify-content:center;min-height:0}
+.counters{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.stat{background:var(--bg-2);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+.stat b{display:block;font:400 56px/1 var(--display);color:var(--fg);font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:8px;font:700 13px/1.3 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.stat em{display:block;margin-top:6px;font:400 16px/1.3 var(--body);font-style:normal;color:var(--fg-2)}
+.quote{padding:18px 22px;border-left:5px solid var(--blue);background:var(--bg-2);border-radius:0 12px 12px 0;font:italic 400 22px/1.4 var(--body);color:var(--fg-2)}
+.quote b{display:block;margin-top:8px;font:700 13px var(--body);font-style:normal;letter-spacing:.14em;text-transform:uppercase;color:var(--blue)}
+
+/* Charts */
+.chartwrap{display:grid;grid-template-rows:auto 1fr;gap:14px;padding:26px 30px;min-height:0}
+.chart-title{font:700 13px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.vbars{position:relative;display:grid;grid-template-columns:repeat(3,150px);gap:44px;align-items:end;padding:44px 0 170px 50px;height:100%;min-height:0}
+.vbars .gate{position:absolute;left:30px;width:690px;border-top:3px dashed var(--yellow)}
+.vbars .gate span{position:absolute;right:0;top:-30px;font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--yellow)}
+.vbar{position:relative;height:100%;display:flex;flex-direction:column;justify-content:flex-end}
+.vbar .fill{height:calc(var(--v) * 100%);background:var(--blue);border-radius:4px 4px 0 0;transform:scaleY(0);transform-origin:bottom;transition:transform .9s cubic-bezier(.2,.8,.2,1)}
+.vbars.shown .vbar .fill{transform:none}
+.vbar .val{position:absolute;left:0;right:0;bottom:calc(var(--v) * 100% + 10px);text-align:center;font:600 24px var(--mono);color:var(--fg);opacity:0;transition:opacity .4s .7s}
+.vbars.shown .vbar .val{opacity:1}
+.vbar .lab{position:absolute;left:0;right:0;bottom:-40px;text-align:center;font:400 17px var(--body);color:var(--fg-2)}
+.vbars[data-step]{opacity:1;transform:none}
+.hbars{display:flex;flex-direction:column;gap:10px}
+.hbar{display:grid;grid-template-columns:170px 1fr 70px;align-items:center;gap:14px;font:400 17px var(--body);color:var(--fg-2)}
+.hbar .track{height:18px;background:var(--bg-3);border-radius:4px;overflow:hidden}
+.hbar .fill{height:100%;width:calc(var(--v) * 100%);background:var(--blue);border-radius:4px;transform:scaleX(0);transform-origin:left;transition:transform .8s cubic-bezier(.2,.8,.2,1)}
+.hbar.muted .fill{background:var(--muted)}
+.shown .hbar .fill,.hbar.shown .fill{transform:none}
+.hbar .num{font:600 18px var(--mono);color:var(--fg);text-align:right;font-variant-numeric:tabular-nums}
+.hgroup{padding:16px 20px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px}
+.hgroup h4{margin:0 0 10px;font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--fg-2)}
+.hgroup h4 small{margin-left:10px;font:400 14px var(--body);letter-spacing:0;text-transform:none;color:var(--muted)}
+.hgroup .hbar{grid-template-columns:110px 1fr 70px}
+.evalgrid{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto auto;align-content:start;gap:16px;min-height:0}
+.evalgrid .tiles4{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.evalgrid .stat b{font-size:50px}
+.evalgrid .stat span{font-size:12px}
+.flag{display:inline-flex;align-items:center;gap:10px;padding:10px 16px;border:2px solid var(--red);border-radius:999px;font:700 14px var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--red)}
+.takeaway{font:400 32px/1.25 var(--display);letter-spacing:.02em;color:var(--fg);padding:18px 22px;background:var(--bg-2);border:1px solid var(--line);border-radius:12px}
+.takeaway em{font-style:normal;color:var(--yellow)}
+
+/* Receipt */
+.receipt{align-self:center;justify-self:center;width:560px;background:var(--paper);color:var(--ink);border-radius:6px;padding:26px 30px;font:400 17px/1.7 var(--mono);box-shadow:0 20px 50px rgba(0,0,0,.45)}
+.receipt h4{margin:0 0 12px;text-align:center;font:400 30px var(--display);letter-spacing:.06em;color:var(--ink)}
+.receipt .r{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed #cfc8b6;padding:2px 0}
+.receipt .r span:last-child{color:var(--ink-2);white-space:nowrap}
+.receipt.shown .r{animation:printline .35s ease both}
+.receipt.shown .r:nth-child(2){animation-delay:.1s}.receipt.shown .r:nth-child(3){animation-delay:.25s}.receipt.shown .r:nth-child(4){animation-delay:.4s}.receipt.shown .r:nth-child(5){animation-delay:.55s}.receipt.shown .r:nth-child(6){animation-delay:.7s}.receipt.shown .r:nth-child(7){animation-delay:.85s}.receipt.shown .r:nth-child(8){animation-delay:1s}.receipt.shown .r:nth-child(9){animation-delay:1.15s}.receipt.shown .r:nth-child(10){animation-delay:1.3s}
+@keyframes printline{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.receipt .tot{margin-top:12px;text-align:center;font:700 14px var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-2)}
+
+/* Picture slide */
+.pic{position:absolute;inset:0;display:grid;place-items:center;padding:18px}
+.pic .frame{position:relative;max-width:100%}
+.pic img{display:block;max-width:100%;max-height:100%;border-radius:10px}
+.pic .lbl{position:absolute;top:30px;padding:8px 14px;border-radius:999px;font:700 13px var(--body);letter-spacing:.14em;text-transform:uppercase;background:rgba(19,23,38,.9);border:1px solid var(--line);color:var(--fg)}
+.pic .lbl.l{left:34px}.pic .lbl.r{right:34px;border-color:var(--blue);color:var(--blue)}
+.pic .ring{position:absolute;width:140px;height:120px;border:4px dashed var(--red);border-radius:50%;left:89%;top:88%;transform:translate(-50%,-50%)}
+.pic .ring.shown{animation:ring 1.6s ease-in-out infinite}
+@keyframes ring{0%,100%{transform:translate(-50%,-50%) scale(1)}50%{transform:translate(-50%,-50%) scale(1.08)}}
+.pic .ring span{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:8px;white-space:nowrap;font:600 15px var(--mono);color:var(--red)}
+
+/* Loop slide */
+.loop .st circle{fill:var(--bg-3);stroke:var(--line);stroke-width:2}
+.loop .st text{fill:var(--fg);font-family:var(--body);font-weight:700;font-size:18px;text-anchor:middle}
+.loop .st.h circle{stroke:var(--yellow);stroke-width:3}
+.loop .ring{fill:none;stroke:var(--line);stroke-width:3}
+.loop .mover{fill:var(--blue)}
+.loop .chk{fill:var(--yellow)}
+.loop .chk-t{fill:var(--yellow);font:700 13px var(--body);letter-spacing:.12em;text-transform:uppercase}
+.loop .guard{fill:var(--fg-2);font:400 15px var(--mono);text-anchor:middle}
+.loop .guard.t{fill:var(--green);font:700 13px var(--body);letter-spacing:.14em}
+.nextlist{position:absolute;left:18px;right:18px;bottom:18px;padding:14px 18px;background:rgba(13,16,25,.92);border:1px solid var(--line);border-radius:12px;font:400 17px/1.5 var(--mono);color:#c8d0e0}
+.nextlist b{color:var(--green);font-weight:600}
+
+/* Matrix */
+.matrix{display:grid;grid-template-columns:150px repeat(3,1fr);gap:10px;align-content:start}
+.matrix .h{font:700 13px var(--body);letter-spacing:.16em;text-transform:uppercase;padding:0 16px 6px;color:var(--muted)}
+.matrix .h.agent{color:var(--blue)}.matrix .h.human{color:var(--yellow)}.matrix .h.auto{color:var(--green)}
+.matrix .row{display:contents}
+.matrix .ph{font:400 30px var(--display);letter-spacing:.03em;padding:16px;color:var(--fg)}
+.matrix .cell{padding:14px 16px;background:var(--bg-2);border:1px solid var(--line);border-radius:10px;font:400 18.5px/1.32 var(--body);color:var(--fg-2)}
+.matrix .cell.agent{border-top:3px solid var(--blue)}.matrix .cell.human{border-top:3px solid var(--yellow)}.matrix .cell.auto{border-top:3px solid var(--green)}
+
+/* Habits */
+.habits{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;align-content:center}
+.habit{background:var(--bg-2);border:1px solid var(--line);border-radius:16px;padding:26px 28px;display:flex;flex-direction:column;gap:14px}
+.habit h3{margin:0;font:400 40px var(--display);letter-spacing:.03em;color:var(--yellow)}
+.habit p{margin:0;font:400 21px/1.35 var(--body);color:var(--fg-2)}
+.habit .ex{margin-top:auto;padding:12px 14px;background:var(--paper);color:var(--ink);border-radius:8px;font:400 15px/1.45 var(--mono)}
+
+/* Cautions */
+.cautions{display:grid;grid-template-columns:repeat(3,1fr);gap:30px 34px;align-content:center;padding:10px 20px}
+.caution{background:var(--red);color:var(--fg);border-radius:16px;padding:24px 26px;box-shadow:0 14px 34px rgba(0,0,0,.35)}
+.caution:nth-child(odd){transform:rotate(-2.5deg)}.caution:nth-child(even){transform:rotate(2deg)}
+.caution[data-step]{transform:rotate(-2.5deg) translateY(12px)}.caution:nth-child(even)[data-step]{transform:rotate(2deg) translateY(12px)}
+.caution[data-step].shown{transform:rotate(-2.5deg)}.caution:nth-child(even)[data-step].shown{transform:rotate(2deg)}
+.caution h3{margin:0 0 8px;font:400 36px/1 var(--display);letter-spacing:.03em;color:#ffd83d}
+.caution p{margin:0;font:400 20px/1.35 var(--body)}
+.caution.y{background:var(--yellow);color:var(--ink)}.caution.y h3{color:var(--red)}
+
+/* Close */
+.close .s-body{align-content:center}
+.close h1{font-size:104px;line-height:1}
+.close h1 em{font-style:normal;color:var(--yellow)}
+.close .links{margin-top:40px;font:400 24px/1.7 var(--mono);color:var(--muted)}
+.close .links b{color:var(--fg);font-weight:600}
+
+/* HUD */
+#bar{position:absolute;left:0;bottom:0;height:4px;background:var(--yellow);width:0;transition:width .4s ease}
+#counter{position:absolute;right:14px;bottom:10px;font:400 13px var(--mono);color:var(--muted)}
+#notes{height:210px;padding:16px max(16px,env(safe-area-inset-right,0px)) 16px max(16px,env(safe-area-inset-left,0px));overflow:auto;background:#0d1019;border-top:1px solid var(--line);font:400 17px/1.5 var(--body);color:var(--fg-2);columns:2;column-gap:40px}
+#notes p{margin:0 0 10px;break-inside:avoid}
+#notes b{color:var(--yellow)}
+#help{position:absolute;inset:0;display:grid;place-items:center;background:rgba(13,16,25,.86);z-index:5}
+#help div{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:26px 32px;font:400 16px/2 var(--mono);color:var(--fg-2)}
+#help kbd{display:inline-block;min-width:28px;padding:0 8px;margin-right:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg-3);color:var(--fg);text-align:center}
+.notes{display:none}
+:focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.loop .mover{display:none}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8b90a6"/></marker>
+  <marker id="ahg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#2fb57c"/></marker>
+  <symbol id="i-agent" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2"/><path d="M7 9l3 3-3 3M12 15h5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-human" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.3-5.7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+
+  <symbol id="o-burst" viewBox="0 0 120 120">
+    <polygon points="60.0,2.0 71.9,15.6 89.0,9.8 92.5,27.5 110.2,31.0 104.4,48.1 118.0,60.0 104.4,71.9 110.2,89.0 92.5,92.5 89.0,110.2 71.9,104.4 60.0,118.0 48.1,104.4 31.0,110.2 27.5,92.5 9.8,89.0 15.6,71.9 2.0,60.0 15.6,48.1 9.8,31.0 27.5,27.5 31.0,9.8 48.1,15.6" fill="#e53e3e"/>
+    <text x="60" y="70" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="28" fill="#ffd83d">SALE</text>
+  </symbol>
+  <symbol id="o-tag" viewBox="0 0 120 60">
+    <rect x="2" y="2" width="116" height="56" rx="8" fill="#141414" stroke="#ffd83d" stroke-width="3"/>
+    <text x="60" y="41" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="27" fill="#ffd83d">20% OFF</text>
+  </symbol>
+  <symbol id="o-ribbon" viewBox="0 0 200 44">
+    <path d="M0 0h200l-10 22 10 22H0l10-22z" fill="#194b9b"/>
+    <text x="100" y="30" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="21" fill="#fff7d6" letter-spacing="2">FREE SHIPPING</text>
+  </symbol>
+  <symbol id="o-star" viewBox="0 0 100 100">
+    <polygon points="50.0,4.0 61.8,33.8 93.7,35.8 69.0,56.2 77.0,87.2 50.0,70.0 23.0,87.2 31.0,56.2 6.3,35.8 38.2,33.8" fill="#ffcf32" stroke="#d9a400" stroke-width="3" stroke-linejoin="round"/>
+  </symbol>
+</defs>
+</svg>
+
+<div class="deck"><div class="deck-inner">
+<div class="stage">
+
+<!-- 1 · Cover -->
+<section class="slide cover" id="slide-1">
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 760 560" aria-label="A product photo of a sneaker. A SALE badge drops onto it and a detector draws a labeled box around the badge.">
+        <rect x="20" y="20" width="720" height="520" rx="18" fill="#faf7ef"/>
+        <image href="assets/prod-shoe.webp" x="80" y="10" width="580" height="580"/>
+        <text x="60" y="500" font-family="Lato,sans-serif" font-weight="700" font-size="30" fill="#141414" opacity=".32" class="auto-pop">© STORE</text>
+        <g class="bbox c-mark auto late"><rect class="b" pathLength="1" x="50" y="466" width="178" height="46"/><g class="lbl"><rect class="l" x="50" y="444" width="168" height="22"/><text x="56" y="460">watermark_logo</text></g></g>
+        <use href="#o-burst" x="520" y="56" width="160" height="160" class="auto-drop"/>
+        <g class="bbox c-badge auto"><rect class="b" pathLength="1" x="514" y="50" width="172" height="172"/><g class="lbl"><rect class="l" x="514" y="28" width="172" height="22"/><text x="520" y="44">promo_badge 0.99</text></g></g>
+      </svg>
+    </div>
+    <div>
+      <span class="kicker">Claude Code Meetup</span>
+      <h1>From dataset <em>to model</em></h1>
+      <p class="sub">ML development with coding agents, told as one engineer's week.</p>
+      <p class="by">Enrique Munguía · 30/10/2026</p>
+      <p class="keys"><kbd>→</kbd> next &nbsp; <kbd>←</kbd> back &nbsp; <kbd>N</kbd> notes &nbsp; <kbd>F</kbd> fullscreen &nbsp; <kbd>?</kbd> help</p>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Opening.</b> This is a story about one small computer-vision project and the coding agent that sat next to me for all of it. The task: find overlays on product photos. The point is not the model. The point is where the agent carried the work, where it had to stop and wait for me, and what that tells you about putting agents into your own ML loop.</p><p>Everything in the deck comes from a real repository. The numbers are real, including the bad ones.</p></aside>
+</section>
+
+<!-- 2 · The task -->
+<section class="slide" id="slide-2">
+  <header class="s-head"><span class="kicker">The task</span><h2>Find the overlays.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="A product photo of a mug. Five kinds of digital overlay appear one by one, each with a labeled bounding box.">
+        <rect x="40" y="40" width="880" height="520" rx="18" fill="#faf7ef"/>
+        <image href="assets/prod-mug.webp" x="230" y="60" width="500" height="500"/>
+        <use href="#o-burst" x="690" y="70" width="150" height="150" class="drop" data-step="1"/>
+        <g class="bbox c-badge" data-step="1"><rect class="b" pathLength="1" x="684" y="64" width="162" height="162"/><rect class="l" x="684" y="42" width="112" height="22"/><text x="690" y="58">promo_badge</text></g>
+        <text x="90" y="500" font-family="Anton,Impact,sans-serif" font-size="40" fill="#ffd83d" stroke="#141414" stroke-width="1.5" paint-order="stroke" class="pop" data-step="2">NEW ARRIVAL</text>
+        <g class="bbox c-text" data-step="2"><rect class="b" pathLength="1" x="82" y="462" width="262" height="48"/><rect class="l" x="82" y="440" width="118" height="22"/><text x="88" y="456">floating_text</text></g>
+        <g class="pop" data-step="3"><circle cx="112" cy="110" r="14" fill="#141414" opacity=".4"/><text x="134" y="120" font-family="Lato,sans-serif" font-weight="700" font-size="28" fill="#141414" opacity=".4">© STORE</text></g>
+        <g class="bbox c-mark" data-step="3"><rect class="b" pathLength="1" x="92" y="90" width="176" height="44"/><rect class="l" x="92" y="68" width="136" height="22"/><text x="98" y="84">watermark_logo</text></g>
+        <use href="#o-ribbon" x="560" y="430" width="280" height="62" transform="rotate(-16 700 461)" class="drop" data-step="4"/>
+        <g class="bbox c-ribbon" data-step="4"><rect class="b" pathLength="1" x="556" y="396" width="290" height="128"/><rect class="l" x="556" y="374" width="124" height="22"/><text x="562" y="390">banner_ribbon</text></g>
+        <use href="#o-star" x="190" y="200" width="120" height="120" class="pop" data-step="5"/>
+        <g class="bbox c-sticker" data-step="5"><rect class="b" pathLength="1" x="186" y="196" width="128" height="128"/><rect class="l" x="186" y="174" width="134" height="22"/><text x="192" y="190">graphic_sticker</text></g>
+      </svg>
+    </div>
+    <div class="legend">
+      <div class="goal"><span>presence</span><span>type</span><span>box</span></div>
+      <div class="cls c-badge" data-step="1"><i></i>promo_badge<small>burst, pill, circle</small></div>
+      <div class="cls c-text" data-step="2"><i></i>floating_text<small>composited words</small></div>
+      <div class="cls c-mark" data-step="3"><i></i>watermark_logo<small>often low opacity</small></div>
+      <div class="cls c-ribbon" data-step="4"><i></i>banner_ribbon<small>edges and corners</small></div>
+      <div class="cls c-sticker" data-step="5"><i></i>graphic_sticker<small>stars, hearts, checks</small></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The problem.</b> E-commerce catalogs are full of product photos where someone pasted a promotional element on top of the picture. We want a model that says whether an overlay is present, what kind it is, and where it is.</p><p><b>Five classes.</b> Promo badge, floating text, watermark or logo, banner ribbon, graphic sticker. This ontology is the first human decision in the whole project and it was written down in PLAN.md before any code existed.</p><p>Build: each keypress adds one overlay with its labeled box, and lights up the matching class on the right.</p></aside>
+</section>
+
+<!-- 3 · The trap -->
+<section class="slide" id="slide-3">
+  <header class="s-head"><span class="kicker">The task</span><h2>Printed text is not an overlay.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="Three products with printed text: a shampoo label, a book cover, a phone screen. Green dashed boxes mark them as physical negatives. Then a 20% OFF tag lands on the bottle and gets a red box.">
+        <rect x="40" y="40" width="880" height="520" rx="18" fill="#faf7ef"/>
+        <image href="assets/prod-bottle.webp" x="60" y="120" width="330" height="330"/>
+        <image href="assets/prod-book.webp" x="315" y="120" width="330" height="330"/>
+        <image href="assets/prod-phone.webp" x="585" y="120" width="330" height="330"/>
+        <g class="neg" data-step="1"><rect class="b" x="178" y="256" width="94" height="120"/><rect class="l" x="178" y="234" width="150" height="22"/><text x="184" y="250">packaging_text</text></g>
+        <g class="neg" data-step="1"><rect class="b" x="408" y="178" width="144" height="214"/><rect class="l" x="408" y="156" width="110" height="22"/><text x="414" y="172">book_cover</text></g>
+        <g class="neg" data-step="1"><rect class="b" x="724" y="222" width="66" height="36"/><rect class="l" x="724" y="200" width="110" height="22"/><text x="730" y="216">screen_text</text></g>
+        <use href="#o-tag" x="140" y="360" width="170" height="85" transform="rotate(-8 225 402)" class="drop" data-step="2"/>
+        <g class="bbox c-badge" data-step="2"><rect class="b" pathLength="1" x="132" y="346" width="186" height="112"/><rect class="l" x="132" y="458" width="112" height="22"/><text x="138" y="474">promo_badge</text></g>
+        <text x="480" y="540" text-anchor="middle" class="svgtext" font-size="22" fill="#5c6271" data-step="1">physical · stays unlabeled</text>
+      </svg>
+    </div>
+    <div class="who">
+      <div class="role human" data-step="1"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Decide what the model must ignore: packaging text, product logos, book covers, screens, scene signs.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Only digitally composited elements count. Write that sentence down before the first line of code.</p></div>
+      <div class="role agent" data-step="3"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Carries the rule everywhere: generator, labeling tool, evaluator, and every report it writes.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The hard part.</b> A label on a shampoo bottle, a book title, a phone screen: all of these are text on an image and none of them is an overlay. The model has to learn the difference between printed and composited.</p><p>These negative kinds became an explicit list in the labeling tool. The agent never had to guess what a negative was, because I had told it. When I asked for something underspecified later, it stopped and asked.</p></aside>
+</section>
+
+<!-- 4 · The loop -->
+<section class="slide" id="slide-4">
+  <header class="s-head"><span class="kicker">Overview</span><h2>One loop, five stations.</h2></header>
+  <div class="s-body one">
+    <div class="loopwrap">
+      <svg class="pipe" viewBox="0 0 1440 260" aria-label="Pipeline: Explore, Label, Model, Eval, Improve, with a return arrow from Improve back to Explore.">
+        <g class="node" data-step="1"><rect x="60" y="40" width="220" height="84" rx="14"/><text x="170" y="96" text-anchor="middle">EXPLORE</text></g>
+        <g class="node" data-step="2"><rect x="345" y="40" width="220" height="84" rx="14"/><text x="455" y="96" text-anchor="middle">LABEL</text></g>
+        <g class="node" data-step="3"><rect x="630" y="40" width="220" height="84" rx="14"/><text x="740" y="96" text-anchor="middle">MODEL</text></g>
+        <g class="node" data-step="4"><rect x="915" y="40" width="220" height="84" rx="14"/><text x="1025" y="96" text-anchor="middle">EVAL</text></g>
+        <g class="node" data-step="5"><rect x="1200" y="40" width="220" height="84" rx="14"/><text x="1310" y="96" text-anchor="middle">IMPROVE</text></g>
+        <path class="arrow" d="M286 82H338"/><path class="arrow" d="M571 82H623"/><path class="arrow" d="M856 82H908"/><path class="arrow" d="M1141 82H1193"/>
+        <path class="ret" d="M1310 130V210H170V136" data-step="5"/>
+        <text x="740" y="236" text-anchor="middle" class="svgtext" font-size="20" fill="#2fb57c" data-step="5">eval tells you what to explore or label next</text>
+      </svg>
+      <div class="legend3">
+        <div class="role agent" data-step="6"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Builds the tooling, runs the experiments, records everything, writes the report.</p></div>
+        <div class="role human" data-step="6"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Defines the problem, judges the data, labels, sets thresholds, decides when to stop.</p></div>
+        <div class="role auto" data-step="6"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The part of each station that can run unattended once the rules are written down.</p></div>
+      </div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The map for the talk.</b> Explore the data, label it, pick and train a model, evaluate it, improve it, and go around again. Every station in this deck gets the same three-way split: what the agent did, what I had to do, and what can run on its own.</p><p>The three colors stay fixed for the rest of the deck: blue is the agent, yellow is the human, green is automation.</p></aside>
+</section>
+
+<!-- 5 · The brief -->
+<section class="slide" id="slide-5">
+  <header class="s-head"><span class="kicker">Before the loop</span><h2>The agent forgets. The files remember.</h2></header>
+  <div class="s-body">
+    <div class="docs">
+      <div class="doc">
+        <h4>PLAN.md</h4>
+        <span class="ln c"># Mission</span>
+        <span class="ln">Detect digitally added overlays on</span>
+        <span class="ln">product images: presence, type, box.</span>
+        <span class="ln c"># Ontology</span>
+        <span class="ln">promo_badge · floating_text</span>
+        <span class="ln">watermark_logo · banner_ribbon</span>
+        <span class="ln">graphic_sticker</span>
+        <span class="ln">Printed text and logos are negatives.</span>
+        <span class="ln c"># Milestones</span>
+        <span class="ln mark" data-step="2">1 Synthetic data   → gate: contact sheet</span>
+        <span class="ln mark" data-step="2">2 Real sources     → gate: source triage</span>
+        <span class="ln mark" data-step="2">3 Baseline         → gate: tiny overfit</span>
+        <span class="ln mark" data-step="2">4 Real evaluation  → gate: 50 reviewed</span>
+        <span class="ln c"># Fresh-session handoff</span>
+        <span class="ln dim">Start here. Do not repeat the M1 review.</span>
+      </div>
+      <div class="doc">
+        <h4>AGENTS.md</h4>
+        <span class="ln">Read PLAN.md before changing scope.</span>
+        <span class="ln">Python 3.11 and uv. Run pytest and ruff.</span>
+        <span class="ln">Visually inspect the contact sheet.</span>
+        <span class="ln mark" data-step="1">Training must pass the mandatory tiny</span>
+        <span class="ln mark" data-step="1">overfit test before scaling.</span>
+        <span class="ln">Keep seeds, provenance, configuration</span>
+        <span class="ln">and asset hashes in metadata.</span>
+        <span class="ln mark" data-step="1">Keep product groups within one split.</span>
+        <span class="ln">Never treat uncertain sources as clean.</span>
+        <span class="ln mark" data-step="1">Do not fabricate review decisions or</span>
+        <span class="ln mark" data-step="1">real evaluation annotations.</span>
+        <span class="ln dim">Keep modules simple, typed, and readable.</span>
+      </div>
+    </div>
+    <div class="who">
+      <div class="role human" data-step="1"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Hard rules go in writing. Short, imperative, and mostly <q>do not</q>.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Each milestone ends at a gate where a person looks before the agent continues.</p></div>
+      <div class="role agent" data-step="3"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Reads both files at the start of every session. Writes the handoff at the end of it.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Two files carried the project.</b> PLAN.md holds the mission, the ontology, the milestones, and a section called "fresh-session handoff" that the agent rewrites at the end of every session. AGENTS.md is about twenty lines of rules.</p><p><b>Why it matters.</b> Every rule the agent later enforced in code (the overfit gate, the leakage-safe splits, the refusal to invent labels) traces back to one of these lines. The agent does not remember yesterday. The files do.</p></aside>
+</section>
+
+<!-- 6 · Explore -->
+<section class="slide" id="slide-6" data-phase="explore">
+  <header class="s-head"><span class="kicker">Data exploration</span><h2>No dataset exists for this problem.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <div class="tiles" id="tiles" data-step="1"><div class="count"><small>downloaded · hashed · decoded</small><span data-count="1000">0</span></div></div>
+      <div class="sheet" data-step="2"><img src="assets/abo_review_sheet.jpg" alt="A review contact sheet of 25 real product photos from the Amazon Berkeley Objects dataset, each labeled uncertain."><div class="tagline"><b>40 review sheets</b> · 1,000 candidates · every one of them <b>uncertain</b> until a human says otherwise</div></div>
+      <div class="agentline" data-step="3"><b>agent ›</b> Inspected sheet 000: digitally composited feature text and dimension arrows occur alongside printed product branding. Source review is necessary before any image feeds generation.</div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Found Amazon Berkeley Objects. Wrote the downloader: safe to rerun, every file verified.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Review sheets for every batch. Same seed, same 1,000 images, every run.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Look at the sheets. Decide whether this data is the problem you are solving.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Exploration.</b> There is no public overlay-detection dataset. The agent proposed Amazon Berkeley Objects, a CC BY 4.0 catalog of product photos, and wrote the acquisition code: deterministic selection by SHA-256 ranking with a seed, byte limits, timeouts, atomic writes, per-image failure records, and a manifest so a rerun verifies hashes and skips what it already has.</p><p><b>The agent looked too.</b> It opened the first review sheet and noticed that real listings already contain composited callouts next to printed branding. It flagged that source review was necessary and did not quietly mark anything clean.</p><p><b>Human.</b> I still had to look at the sheets myself and decide that this catalog represents the problem. Nobody else can make that call.</p></aside>
+</section>
+
+<!-- 7 · Synthetic data -->
+<section class="slide" id="slide-7" data-phase="explore">
+  <header class="s-head"><span class="kicker">Data exploration</span><h2>No labels? Make them.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="A clean mug photo passes through a generator with a config card and comes out with a SALE badge and a ribbon, each with a labeled box, plus a metadata receipt.">
+        <rect x="30" y="40" width="270" height="340" rx="14" fill="#faf7ef"/>
+        <image href="assets/prod-mug.webp" x="40" y="55" width="250" height="250"/>
+        <text x="165" y="350" text-anchor="middle" class="svgtext" font-size="17" fill="#5c6271">clean source</text>
+        <path class="arrow" d="M312 210H352" stroke="#8b90a6" stroke-width="3" marker-end="url(#ah)"/>
+        <rect x="365" y="40" width="230" height="340" rx="14" fill="#1b2033" stroke="#2e3650" stroke-width="2"/>
+        <text x="480" y="78" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="26" fill="#ffcf32" letter-spacing="1">GENERATOR</text>
+        <g class="mono" font-size="15" fill="#c8d0e0">
+          <text x="386" y="118">classes:     5</text>
+          <text x="386" y="146">placement:   corner edge</text>
+          <text x="386" y="168">             center clipped</text>
+          <text x="386" y="196">opacity:     0.15 – 1.0</text>
+          <text x="386" y="224">rotation:    ±30°</text>
+          <text x="386" y="252">count:       up to 3</text>
+          <text x="386" y="280">p(overlay):  0.75</text>
+          <text x="386" y="318" fill="#ffcf32">seed = sha256(</text>
+          <text x="386" y="340" fill="#ffcf32">  global, source, index)</text>
+        </g>
+        <path class="arrow" d="M607 210H647" stroke="#8b90a6" stroke-width="3" marker-end="url(#ah)"/>
+        <rect x="660" y="40" width="270" height="340" rx="14" fill="#faf7ef"/>
+        <image href="assets/prod-mug.webp" x="670" y="55" width="250" height="250"/>
+        <use href="#o-burst" x="820" y="56" width="92" height="92" class="drop" data-step="1"/>
+        <g class="bbox c-badge" data-step="1"><rect class="b" pathLength="1" x="816" y="52" width="100" height="100"/><rect class="l" x="816" y="30" width="98" height="20"/><text x="820" y="45" font-size="12">promo_badge</text></g>
+        <use href="#o-ribbon" x="672" y="290" width="200" height="44" transform="rotate(-12 772 312)" class="drop" data-step="1"/>
+        <g class="bbox c-ribbon" data-step="1"><rect class="b" pathLength="1" x="668" y="264" width="208" height="96"/><rect class="l" x="668" y="242" width="110" height="20"/><text x="672" y="257" font-size="12">banner_ribbon</text></g>
+        <text x="795" y="350" text-anchor="middle" class="svgtext" font-size="17" fill="#5c6271" data-step="1">labeled example</text>
+        <g data-step="2">
+          <rect x="30" y="405" width="900" height="165" rx="12" fill="#0d1019" stroke="#2e3650" stroke-width="2"/>
+          <g class="mono" font-size="16" fill="#c8d0e0">
+            <text x="52" y="438" fill="#5b8def" font-weight="600">metadata.jsonl · one record per image</text>
+            <text x="52" y="468">source: fixtures/mug.png  sha256 9f3a…  product_ids: [B07…]</text>
+            <text x="52" y="494">renderer: v1   pillow: 12.3.0   fonts: Anton 2c1e…  Lato 77d0…</text>
+            <text x="52" y="520">overlays: [{promo_badge, burst, corner, opacity 0.92, rot -14°}, …]</text>
+            <text x="52" y="550" fill="#2fb57c">replay --record-index 10  →  pixel checksum matched · 100 / 100 regenerated</text>
+          </g>
+        </g>
+      </svg>
+      <div class="sheet" data-step="3"><img src="assets/synthetic_contact_sheet.jpg" alt="A 25-image contact sheet of synthetic overlays on illustrated products, with labeled boxes."><svg viewBox="0 0 960 600" style="position:absolute;inset:0;width:100%;height:100%" aria-hidden="true"><g transform="rotate(-12 700 160)"><rect x="520" y="110" width="360" height="100" rx="10" fill="none" stroke="#ffcf32" stroke-width="5"/><text x="700" y="178" text-anchor="middle" class="stamp fill" font-size="54">LOOKS GOOD ✓</text></g></svg><div class="tagline"><b>Gate 1</b> · 100 images, 128 boxes, 20 negatives · the agent waited</div></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built a generator for all five classes: shapes, fonts, placement, opacity, occlusion, clipped boxes, COCO export. 108 tests.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Every image is replayable from its record. A single box with bad coordinates, like zero size or a box outside the image, fails validation for the whole dataset.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Look at the contact sheet. <q>Bad synthetic data makes the experiment look successful while teaching the wrong problem.</q></p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Synthetic first.</b> Milestone 1 was a generator that composites badges, text, watermarks, ribbons and stickers onto clean product images and writes COCO boxes measured from the actual visible pixels after rotation, clipping and occlusion.</p><p><b>Reproducibility came for free</b> because AGENTS.md asked for it once: per-sample seeds derived from the global seed, source id and index; font and asset hashes; renderer version; a replay command that regenerates any image and checks the pixel checksum.</p><p><b>The gate.</b> The plan said: stop after milestone 1, show a contact sheet, wait. I opened it in Chrome, said "looks good", and the agent recorded that sentence and the date in the milestone report. That quote about bad synthetic data is in PLAN.md and it is the reason the gate exists.</p></aside>
+</section>
+
+<!-- 8 · Labeling tool -->
+<section class="slide" id="slide-8" data-phase="label">
+  <header class="s-head"><span class="kicker">Training data labeling</span><h2>The agent built the labeling tool.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="A mock of the local labeling tool: an image canvas where a cursor drags out a box, class keys 1 to 5, and a saved status.">
+        <rect x="0" y="0" width="960" height="600" fill="#f6f6f2"/>
+        <rect x="0" y="0" width="960" height="60" fill="#ffffff"/>
+        <text x="24" y="38" font-family="Lato,sans-serif" font-weight="900" font-size="22" fill="#1d2230">Overlay review</text>
+        <text x="190" y="37" font-family="Lato,sans-serif" font-size="12" letter-spacing="2" fill="#6b7280">LOCAL · HUMAN LABELS</text>
+        <text x="936" y="38" text-anchor="end" font-family="Lato,sans-serif" font-size="16" fill="#2f7a4a" data-step="1">Saved · reviewed</text>
+        <rect x="0" y="60" width="200" height="540" fill="#ffffff"/>
+        <g font-family="Lato,sans-serif" font-size="13" fill="#1d2230">
+          <text x="20" y="96" font-weight="700">Workflow</text>
+          <rect x="18" y="106" width="164" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="28" y="126">Real evaluation</text>
+          <text x="20" y="172" font-weight="700">Queue</text>
+          <rect x="18" y="182" width="164" height="38" rx="6" fill="#e7efe9" stroke="#2f7a4a"/><text x="28" y="198">B07K…</text><text x="28" y="212" font-size="10" fill="#6b7280">real_eval · draft</text>
+          <rect x="18" y="226" width="164" height="38" rx="6" fill="none" stroke="#cfd4dc"/><text x="28" y="242">B08Q…</text><text x="28" y="256" font-size="10" fill="#6b7280">unassigned</text>
+          <rect x="18" y="270" width="164" height="38" rx="6" fill="none" stroke="#cfd4dc"/><text x="28" y="286">B01N…</text><text x="28" y="300" font-size="10" fill="#6b7280">unassigned</text>
+        </g>
+        <rect x="220" y="84" width="500" height="440" rx="8" fill="#faf7ef" stroke="#d9dde5"/>
+        <image href="assets/prod-bottle.webp" x="270" y="94" width="400" height="400"/>
+        <use href="#o-tag" x="478" y="214" width="140" height="70" transform="rotate(-8 548 249)"/>
+        <g data-step="1" class="drag">
+          <rect class="draw" x="466" y="196" width="164" height="106" fill="rgba(229,72,77,.18)" stroke="#dd4b4b" stroke-width="3"/>
+          <path class="cur" d="M630 302l0 22 6-5 5 11 5-2-5-11 8-1z" fill="#1d2230" stroke="#fff" stroke-width="1.5"/>
+        </g>
+        <rect x="740" y="60" width="220" height="540" fill="#ffffff"/>
+        <g font-family="Lato,sans-serif" font-size="13" fill="#1d2230">
+          <text x="760" y="96" font-weight="700">Class (keys 1–5)</text>
+          <rect x="758" y="108" width="184" height="30" rx="6" fill="#fbe9e9" stroke="#dd4b4b"/><text x="770" y="128">1 · promo_badge</text>
+          <rect x="758" y="144" width="184" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="770" y="164">2 · floating_text</text>
+          <rect x="758" y="180" width="184" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="770" y="200">3 · watermark_logo</text>
+          <rect x="758" y="216" width="184" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="770" y="236">4 · banner_ribbon</text>
+          <rect x="758" y="252" width="184" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="770" y="272">5 · graphic_sticker</text>
+          <text x="760" y="320" font-weight="700">Negative kind</text>
+          <rect x="758" y="332" width="184" height="30" rx="6" fill="none" stroke="#cfd4dc"/><text x="770" y="352" fill="#6b7280">packaging_text…</text>
+          <rect x="758" y="392" width="184" height="36" rx="6" fill="#2f7a4a"/><text x="850" y="415" text-anchor="middle" fill="#fff" font-weight="700">Complete positive review</text>
+          <rect x="758" y="438" width="184" height="36" rx="6" fill="none" stroke="#cfd4dc"/><text x="850" y="461" text-anchor="middle">Save unfinished draft</text>
+          <text x="760" y="510" font-weight="700">Progress</text>
+          <text x="760" y="532" fill="#6b7280">92 / 50 reviewed · 12 positive</text>
+          <text x="760" y="550" fill="#6b7280">80 negative · 0 stale</text>
+        </g>
+        <text x="470" y="560" text-anchor="middle" font-family="Lato,sans-serif" font-size="13" fill="#6b7280">Label only digitally added elements. Printed logos, covers, screens and signs are negatives. Low resolution is a reason to defer.</text>
+      </svg>
+      <div class="sheet" data-step="2"><img src="assets/labeling_ui.png" alt="Screenshot of the real labeling tool with two boxes drawn on an illustrated kettle, class selector, and review buttons."><div class="tagline"><b>The real thing.</b> The agent launched it and drove Chrome itself: drag, reverse drag, resize, undo, zoom, pan, reload, save. 168 tests.</div></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Standard-library server, SVG canvas, keyboard shortcuts, drafts, atomic saves with backups. No build step.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Reserving an image reserves its whole product group, so nothing lands in both training and evaluation.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Manually labels the images by drawing boxes.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Labeling.</b> I asked for a local labeling tool with two workflows: source triage (clean / overlay / uncertain, keys 1 2 3) and real evaluation annotation (draw boxes, pick a class, confirm). One session. The agent wrote a plan document first, then the server and page, then it opened Chrome and exercised every interaction with real mouse and keyboard events, and recorded the evidence.</p><p><b>Leakage safety is built into the tool.</b> Images of the same product, or sharing a source hash, form a connected group. Labeling one reserves the whole group for one purpose. The training manifests you supply are checked, so an image that was already trained on cannot become an evaluation example.</p><p><b>Human.</b> The tool is great. I still had to draw every box.</p></aside>
+</section>
+
+<!-- 9 · Zero labels invented -->
+<section class="slide" id="slide-9" data-phase="label">
+  <header class="s-head"><span class="kicker">Training data labeling</span><h2>Zero labels invented.</h2></header>
+  <div class="s-body">
+    <div class="stack">
+      <div class="term">
+        <div><span class="p">$</span> prepare_real_eval.py --annotations real-review.json --output data/eval/real-v0</div>
+        <div class="err" data-step="1">error: Need 50 genuinely reviewed real images; found 0</div>
+        <div class="dim" data-step="1"># 1,000 candidates downloaded. 1,000 still uncertain. The agent stopped here and asked.</div>
+        <div data-step="2"><span class="p">$</span> label_images.py --input data/raw/abo --port 8765 &nbsp; <span class="dim"># task for a human</span></div>
+      </div>
+      <div class="counters" data-step="3">
+        <div class="stat"><b data-count="329">0</b><span>source decisions</span><em>294 clean · 35 overlay</em></div>
+        <div class="stat"><b data-count="92">0</b><span>evaluation images</span><em>12 positive · 80 negative</em></div>
+        <div class="stat"><b data-count="1">0</b><span>evening</span><em>minimum of 50 reached</em></div>
+      </div>
+      <div class="quote" data-step="4">Minimum met. Zero reviewed examples for promo_badge, watermark_logo and banner_ribbon. Prioritize those next, and vary product types so phone cases do not dominate.<b>agent · handoff note, read from the live state of the tool</b></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Refused to mark anything clean or draw a single box. The rule said so.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>One evening of real labels. Every record carries my handle and the image hash.</p></div>
+      <div class="role auto" data-step="5"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Next: pre-label with the current model, humans verify. Judge with a second model against independent references.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The best thing the agent did was nothing.</b> The export tool refused to produce a real evaluation set with zero reviewed images, and the agent refused to fill the gap. AGENTS.md says "do not fabricate", and it held through four milestones and a dozen sessions.</p><p><b>Then I labeled.</b> 329 source decisions and 92 evaluation annotations in one evening, with the tool the agent had built that afternoon.</p><p><b>And the agent read the result.</b> It queried the running tool's state endpoint, computed class coverage, and wrote a handoff note telling me which classes had no examples yet and which product types were overrepresented. That is exploration again, on my labels.</p><p><b>Automation glimpse.</b> The project already has a template for model-generated reference labels, kept in a separate cohort, never mixed with human ground truth.</p></aside>
+</section>
+
+<!-- 10 · Choosing the model -->
+<section class="slide" id="slide-10" data-phase="model">
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Start boring.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="A fork in the road: a greyed sign for custom representation learning, a lit sign for a pretrained YOLOv8n checkpoint. Below, images grouped into connected components, each colored by split.">
+        <path d="M480 300V120" stroke="#2e3650" stroke-width="6" stroke-linecap="round"/>
+        <path d="M480 300L240 460M480 300L720 460" stroke="#2e3650" stroke-width="6" stroke-linecap="round"/>
+        <circle cx="480" cy="300" r="12" fill="#2e3650"/>
+        <g data-step="1">
+          <rect x="60" y="40" width="340" height="110" rx="12" fill="#242b42" stroke="#2e3650" stroke-width="2"/>
+          <text x="230" y="84" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="30" fill="#8b90a6" letter-spacing="1">JEPA · DINO · SigLIP</text>
+          <text x="230" y="118" text-anchor="middle" class="svgtext" font-size="19" fill="#8b90a6">custom representation learning</text>
+          <g transform="rotate(-8 230 95)"><rect x="150" y="68" width="160" height="50" rx="8" fill="none" stroke="#e5484d" stroke-width="4"/><text x="230" y="105" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="34" fill="#e5484d" letter-spacing="3">LATER</text></g>
+        </g>
+        <g data-step="1">
+          <rect x="560" y="40" width="340" height="110" rx="12" fill="#1b2033" stroke="#ffcf32" stroke-width="3"/>
+          <text x="730" y="84" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="30" fill="#fff7d6" letter-spacing="1">yolov8n.pt</text>
+          <text x="730" y="118" text-anchor="middle" class="svgtext" font-size="19" fill="#d6d1bf">pretrained · 3M params · fine-tune</text>
+        </g>
+        <path d="M400 95H445M515 95H560" stroke="#2e3650" stroke-width="4"/>
+        <g data-step="2">
+          <text x="480" y="520" text-anchor="middle" class="svgtext" font-size="19" fill="#d6d1bf">split by connected group: same product, same source, same hash stay together</text>
+          <g stroke="#8b90a6" stroke-width="2">
+            <path d="M120 400L170 360M170 360L220 400M120 400L220 400"/>
+            <path d="M300 370L350 420M350 420L400 380M400 380L450 430"/>
+            <path d="M560 380L610 420M610 420L660 370"/>
+            <path d="M760 400L820 360"/>
+          </g>
+          <g fill="#5b8def"><circle cx="120" cy="400" r="12"/><circle cx="170" cy="360" r="12"/><circle cx="220" cy="400" r="12"/><circle cx="300" cy="370" r="12"/><circle cx="350" cy="420" r="12"/><circle cx="400" cy="380" r="12"/><circle cx="450" cy="430" r="12"/></g>
+          <g fill="#f08a3c"><circle cx="560" cy="380" r="12"/><circle cx="610" cy="420" r="12"/><circle cx="660" cy="370" r="12"/></g>
+          <g fill="#2fb57c"><circle cx="760" cy="400" r="12"/><circle cx="820" cy="360" r="12"/><circle cx="880" cy="410" r="12"/></g>
+          <g font-family="Lato,sans-serif" font-size="15" font-weight="700" letter-spacing="2">
+            <text x="285" y="470" text-anchor="middle" fill="#5b8def">TRAIN</text><text x="610" y="470" text-anchor="middle" fill="#f08a3c">VAL</text><text x="820" y="470" text-anchor="middle" fill="#2fb57c">TEST</text>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div class="who">
+      <div class="role human" data-step="1"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Pretrained detector first. <q>Do not begin with JEPA or custom representation learning.</q> Written in the plan.</p></div>
+      <div class="role agent" data-step="2"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>COCO to YOLO conversion, grouped 80/10/10 splits, training script, stable prediction JSON.</p></div>
+      <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Blocks real eval images from being converted to training data. Images from the same product stay together in one split.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Architecture is a human decision, and the boring one wins.</b> The plan explicitly says to establish a conventional baseline before any self-supervised or custom representation work. The agent would happily have built a JEPA pipeline. It is much better at building what you ask for than at knowing what you should ask for.</p><p><b>What the agent did well:</b> the unglamorous plumbing. Converting COCO to YOLO format, grouping images into connected components so that variants of one product never straddle train and test, and refusing at the tool level to convert real evaluation data into training data.</p></aside>
+</section>
+
+<!-- 11 · Overfit gate -->
+<section class="slide" id="slide-11" data-phase="model">
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Prove it can memorize 64 images.</h2></header>
+  <div class="s-body">
+    <div class="fig chartwrap">
+      <div class="chart-title">Overfit test · 64 images · 50 epochs · no augmentation · validation = training set</div>
+      <div class="vbars" data-step="1">
+        <div class="gate" style="bottom:calc(170px + 0.90 * (100% - 214px))"><span>gate ≥ 0.90</span></div>
+        <div class="vbar" style="--v:.947"><div class="fill"></div><div class="val">0.947</div><div class="lab">mAP@0.5</div></div>
+        <div class="vbar" style="--v:.936"><div class="fill"></div><div class="val">0.936</div><div class="lab">precision</div></div>
+        <div class="vbar" style="--v:.924"><div class="fill"></div><div class="val">0.924</div><div class="lab">recall</div></div>
+      </div>
+      <svg viewBox="0 0 300 120" style="position:absolute;right:60px;top:200px;width:300px;height:120px" aria-hidden="true" data-step="2" class="pop"><g transform="rotate(-10 150 60)"><rect x="40" y="25" width="220" height="70" rx="10" fill="none" stroke="#2fb57c" stroke-width="5"/><text x="150" y="80" text-anchor="middle" font-family="Anton,Impact,sans-serif" font-size="56" fill="#2fb57c" letter-spacing="4">PASS</text></g></svg>
+      <div class="term" data-step="3" style="position:absolute;left:30px;right:30px;bottom:26px;font-size:16px;padding:14px 20px"><span class="dim"># configs/train.yaml</span><br>overfit_gate: runs/fixture-overfit-001/overfit_gate.json &nbsp;<span class="dim"># checkpoint + manifest hashes</span><br><span class="err">baseline training refuses to start without passing gate evidence</span></div>
+    </div>
+    <div class="who">
+      <div class="role human" data-step="1"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Set the thresholds. If the pipeline cannot overfit a handful of images, nothing downstream means anything.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The gate is code, not a checklist. It records checkpoint and dataset hashes.</p></div>
+      <div class="role agent" data-step="3"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Only after the pass: a 20-epoch grouped baseline on 100 / 40 / 20 images. Weak, and labeled as weak.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The tiny overfit test.</b> Before any real training run, take 64 images, point validation at the same 64, switch off augmentation, and train until the model memorizes them. If mAP, precision and recall do not all clear 0.90, the pipeline is broken somewhere: labels, conversion, class ids, image size.</p><p><b>What is unusual here</b> is that the agent made the gate structural. The baseline config points at the gate file. If the gate is missing, failed, or its hashes do not match the current checkpoint and dataset, training refuses to start. A rule in AGENTS.md became a check in code.</p><p><b>The baseline itself</b> is a short 20-epoch YOLOv8n run on illustrated fixtures. Validation mAP@0.5 was 0.55 with recall 0.43. The agent's own report calls it weak. That honesty matters later.</p></aside>
+</section>
+
+<!-- 12 · Foundation model -->
+<section class="slide" id="slide-12" data-phase="model">
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Check what a foundation model gives you for free.</h2></header>
+  <div class="s-body">
+    <div class="stack">
+      <div class="hgroup" data-step="1"><h4>Overlay presence<small>per image · 36 real photos · zero-shot VLM</small></h4><div class="hbars"><div class="hbar" style="--v:.90"><span>precision</span><div class="track"><div class="fill"></div></div><span class="num">90%</span></div><div class="hbar" style="--v:.69"><span>recall</span><div class="track"><div class="fill"></div></div><span class="num">69%</span></div></div></div>
+      <div class="hgroup" data-step="2"><h4>Typed overlay boxes<small>IoU ≥ 0.5, class must match</small></h4><div class="hbars"><div class="hbar" style="--v:.047"><span>precision</span><div class="track"><div class="fill"></div></div><span class="num">4.7%</span></div><div class="hbar" style="--v:.05"><span>recall</span><div class="track"><div class="fill"></div></div><span class="num">5.0%</span></div></div></div>
+      <div class="hgroup" data-step="3"><h4>Main product box<small>one box per image</small></h4><div class="hbars"><div class="hbar" style="--v:.76"><span>precision</span><div class="track"><div class="fill"></div></div><span class="num">76%</span></div><div class="hbar" style="--v:.74"><span>recall</span><div class="track"><div class="fill"></div></div><span class="num">74%</span></div></div></div>
+      <div class="takeaway" data-step="4">Presence is nearly free. <em>Localization needs training.</em></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Built the pilot in a day: frozen sample, cached API calls, a grading page, metrics with human and model references kept apart.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Graded 36 images. Noticed the OCR text was bad. The agent wrote that down as a limitation of the whole result, not a footnote.</p></div>
+      <div class="role auto" data-step="4"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Same images, same grading file, any model. Rerun the comparison when a new model ships.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>A detour worth taking.</b> Before investing in training data, ask a hosted vision-language model to do the task zero-shot on a small, deliberately enriched real sample. The agent built the whole pilot: sampling with provenance, cached requests so a rerun costs nothing, an interactive grading report, and separate metrics for human versus model references.</p><p><b>The result shaped the plan.</b> Image-level presence was decent out of the box. Typed boxes were near zero. So the trained detector is for localization and type, and a foundation model could serve as a cheap presence pre-filter or a pre-labeler.</p><p><b>Human judgment again.</b> I graded the sample and reported that the OCR transcriptions were poor. The agent recorded that as a material limitation and listed the controlled follow-up it would take to separate transcription errors from classification errors. It did not run that follow-up on its own.</p></aside>
+</section>
+
+<!-- 13 · Reproducible -->
+<section class="slide" id="slide-13" data-phase="model">
+  <header class="s-head"><span class="kicker">Architecture and weights</span><h2>Every run remembers how it was made.</h2></header>
+  <div class="s-body">
+    <div class="fig" style="display:grid">
+      <div class="receipt" data-step="1">
+        <h4>runs/fixture-baseline-001</h4>
+        <div class="r"><span>config.yaml</span><span>sha256 e8cc…</span></div>
+        <div class="r"><span>seed</span><span>42</span></div>
+        <div class="r"><span>git commit + working-tree diff</span><span>2bea0e2</span></div>
+        <div class="r"><span>source files (22)</span><span>hashed</span></div>
+        <div class="r"><span>uv.lock</span><span>6d2a…</span></div>
+        <div class="r"><span>initial weights yolov8n.pt</span><span>hashed</span></div>
+        <div class="r"><span>dataset manifest</span><span>4398…</span></div>
+        <div class="r"><span>metrics.json · results.csv</span><span>saved</span></div>
+        <div class="r"><span>console.log</span><span>saved</span></div>
+        <div class="tot">thank you · overwrite refused</div>
+      </div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Did all of this because one line in AGENTS.md asked for provenance. Nobody specified the list.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Datasets and runs refuse to overwrite. Replay verifies pixels. Gates verify hashes.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Can trust a number three weeks later. Can also admit the GPU is not bit-deterministic.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Provenance by default.</b> Every training run saves its config, seed, git commit and uncommitted diff, hashes of every source file, the lockfile, the initial weights, and the dataset manifest, next to the metrics and logs. New output names are required; an existing run directory is never overwritten.</p><p><b>Why this is an agent strength.</b> Humans skip this because it is tedious. The agent does not get bored. One sentence in the rules file bought the whole receipt.</p><p><b>The honest caveat</b> it also wrote: on Apple MPS some kernels are nondeterministic, so a recorded seed does not promise bit-identical weights.</p></aside>
+</section>
+
+<!-- 14 · Numbers first -->
+<section class="slide" id="slide-14" data-phase="eval">
+  <header class="s-head"><span class="kicker">Running eval</span><h2>Numbers first.</h2></header>
+  <div class="s-body">
+    <div class="evalgrid">
+      <div class="tiles4" data-step="1">
+        <div class="stat"><b>0.49</b><span>mAP@0.5 · 20 held-out</span></div>
+        <div class="stat"><b>0.06</b><span>box recall @ conf 0.25</span></div>
+        <div class="stat"><b>1 / 13</b><span>positive images found</span></div>
+        <div class="stat"><b>0 / 7</b><span>false positives on negatives</span></div>
+      </div>
+      <div class="hgroup" data-step="2"><h4>AP@0.5 per class</h4><div class="hbars">
+        <div class="hbar" style="--v:.67"><span>banner_ribbon</span><div class="track"><div class="fill"></div></div><span class="num">0.67</span></div>
+        <div class="hbar" style="--v:.63"><span>promo_badge</span><div class="track"><div class="fill"></div></div><span class="num">0.63</span></div>
+        <div class="hbar" style="--v:.50"><span>graphic_sticker</span><div class="track"><div class="fill"></div></div><span class="num">0.50</span></div>
+        <div class="hbar" style="--v:.43"><span>watermark_logo</span><div class="track"><div class="fill"></div></div><span class="num">0.43</span></div>
+        <div class="hbar" style="--v:.22"><span>floating_text</span><div class="track"><div class="fill"></div></div><span class="num">0.22</span></div>
+      </div></div>
+      <div class="hgroup" data-step="3"><h4>Misses by bucket<small>17 missed boxes</small></h4><div class="hbars">
+        <div class="hbar muted" style="--v:.588"><span>overlay_missed</span><div class="track"><div class="fill"></div></div><span class="num">10</span></div>
+        <div class="hbar muted" style="--v:.353"><span>small_overlay</span><div class="track"><div class="fill"></div></div><span class="num">6</span></div>
+        <div class="hbar muted" style="--v:.059"><span>graphic_only</span><div class="track"><div class="fill"></div></div><span class="num">1</span></div>
+        <div class="hbar muted" style="--v:0"><span>false_positive</span><div class="track"><div class="fill"></div></div><span class="num">0</span></div>
+      </div><div style="margin-top:14px" data-step="4"><span class="flag">synthetic smoke · not a real evaluation</span></div></div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Wrote the evaluator: COCO AP, fixed-threshold precision and recall, presence metrics, negative false-positive rate, per-class AP.</p></div>
+      <div class="role agent" data-step="4"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p><q>AP ranks from confidence 0.001; the operating point is 0.25. That explains the gap. Do not tune the threshold on this test set.</q></p></div>
+      <div class="role human" data-step="5"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Pick the operating point on validation. Decide which misses cost money.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The numbers are bad, and that is fine.</b> This is a 20-epoch baseline on illustrated fixtures, evaluated on 20 held-out images. Ranking AP is around 0.49 but at the fixed 0.25 confidence the detector finds one box out of eighteen and one positive image out of thirteen. Zero false positives on seven negatives.</p><p><b>What the agent did right</b> is in the labels around the numbers. The JSON has a field called synthetic_smoke set to true and real_evaluation set to false. The report explains why AP and fixed-threshold recall disagree, and it warns me not to tune the threshold on the test split. Missing classes return null, not an invented zero.</p><p><b>Human.</b> Which misses matter is a product question. A missed watermark and a missed "20% OFF" badge have very different costs in a catalog.</p></aside>
+</section>
+
+<!-- 15 · Look at the pictures -->
+<section class="slide" id="slide-15" data-phase="eval">
+  <header class="s-head"><span class="kicker">Running eval</span><h2>Then look at the pictures.</h2></header>
+  <div class="s-body">
+    <div class="fig">
+      <div class="pic">
+        <div class="frame"><img src="assets/false_negative.jpg" alt="Side by side: on the left the ground truth shows a watermark box under a sneaker; on the right the model's prediction shows nothing."><div class="ring" data-step="2"><span>missed watermark_logo</span></div></div>
+        <span class="lbl l" data-step="1">ground truth</span>
+        <span class="lbl r" data-step="1">prediction @ 0.25</span>
+      </div>
+      <div class="cap">artifacts/error_analysis/…/false_negatives/overlay_missed/0000072.jpg</div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Exports every error with ground truth beside prediction, sorted into buckets: small overlay, graphic only, transparent, over product, physical-text false positive.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Open the folders. A bucket is a hint, not a diagnosis.</p></div>
+      <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The bucket counts become the next hypothesis list.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Error analysis you can see.</b> For every false negative and false positive the evaluator writes an image: ground truth on the left, prediction at the operating point on the right, into a folder named after the bucket. This one is a watermark on a sneaker that the baseline simply missed.</p><p><b>Buckets are aids, not explanations.</b> The agent's report says exactly that. The categorization uses heuristics like box size and the attributes you recorded when labeling. It tells you where to look, and then a person looks.</p></aside>
+</section>
+
+<!-- 16 · Close the loop -->
+<section class="slide" id="slide-16" data-phase="improve">
+  <header class="s-head"><span class="kicker">Improvement loops</span><h2>Close the loop.</h2></header>
+  <div class="s-body">
+    <div class="fig loop">
+      <svg class="ill" viewBox="0 0 960 600" aria-label="A circular loop of six stations: eval, buckets, hypothesis, change, gate, train. A blue dot travels around it. Yellow checkpoints mark where a human approves.">
+        <circle class="ring" cx="430" cy="300" r="200"/>
+        <path id="orbit" d="M430 100a200 200 0 1 1-0.01 0" fill="none"/>
+        <g class="st"><circle cx="430" cy="100" r="46"/><text x="430" y="106">eval</text></g>
+        <g class="st"><circle cx="603" cy="200" r="46"/><text x="603" y="206">buckets</text></g>
+        <g class="st h"><circle cx="603" cy="400" r="50"/><text x="603" y="406">hypothesis</text></g>
+        <g class="st"><circle cx="430" cy="500" r="46"/><text x="430" y="506">change</text></g>
+        <g class="st h"><circle cx="257" cy="400" r="46"/><text x="257" y="406">gate</text></g>
+        <g class="st"><circle cx="257" cy="200" r="46"/><text x="257" y="206">train</text></g>
+        <g data-step="1">
+          <polygon class="chk" points="660,370 674,384 660,398 646,384"/><text class="chk-t" x="684" y="389">human approves</text>
+          <polygon class="chk" points="200,370 214,384 200,398 186,384"/><text class="chk-t" x="180" y="389" text-anchor="end">must pass</text>
+          <polygon class="chk" points="430,40 444,54 430,68 416,54"/><text class="chk-t" x="454" y="59">ship? stop?</text>
+        </g>
+        <g data-step="2">
+          <text class="guard t" x="430" y="262" text-anchor="middle">GUARDRAILS</text>
+          <text class="guard" x="430" y="292">overfit gate before scaling</text>
+          <text class="guard" x="430" y="316">leakage check on every split</text>
+          <text class="guard" x="430" y="340">synthetic never reported as real</text>
+          <text class="guard" x="430" y="364">new run dir, never overwrite</text>
+        </g>
+        <circle class="mover" r="10"><animateMotion dur="9s" repeatCount="indefinite" rotate="auto"><mpath href="#orbit"/></animateMotion></circle>
+      </svg>
+      <div class="nextlist" data-step="4"><b>next for this project ›</b> generate ABO synthetic from the 294 clean sources · overfit gate again · real evaluation on the 92 labeled images · RPC packaging-text negatives</div>
+    </div>
+    <div class="who">
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Runs the inner loop: read buckets, propose a change, retrain, re-evaluate, write the report.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Approves hypotheses. Owns the stop condition. Looks at every new contact sheet.</p></div>
+      <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Let it run a few iterations overnight inside the guardrails. Read the morning report.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The loop the agent can run.</b> Evaluate, read the error buckets, propose a hypothesis, change data or config, pass the overfit gate, train, evaluate again. Each lap produces a run directory with full provenance and a report.</p><p><b>Where the human sits.</b> Approving the hypothesis before compute is spent, looking at any new synthetic data, and deciding when the model is good enough or when to stop. These are the yellow diamonds.</p><p><b>The guardrails</b> are what make unattended laps safe: the gate, the leakage checks, the rule that synthetic numbers never get reported as real, and run directories that refuse to overwrite.</p><p><b>Where this project stands.</b> The 294 clean sources are reviewed, the 92 evaluation images are labeled, and the real-data lap has not been run yet. That is the next session.</p></aside>
+</section>
+
+<!-- 17 · Framework -->
+<section class="slide" id="slide-17">
+  <header class="s-head"><span class="kicker">Takeaway</span><h2>Who does what, station by station.</h2></header>
+  <div class="s-body one">
+    <div class="matrix">
+      <div class="h"></div><div class="h agent">Agent</div><div class="h human">Human</div><div class="h auto">Automate</div>
+      <div class="row"><div class="ph">EXPLORE</div><div class="cell agent">finds sources, writes downloaders, builds contact sheets, flags what it sees</div><div class="cell human">defines the ontology and the negatives, looks at the sheets</div><div class="cell auto">seeded sampling, checksums, review sheets per batch</div></div>
+      <div class="row"><div class="ph">LABEL</div><div class="cell agent">builds the labeling tool, tests it in a real browser, reads the live state</div><div class="cell human">draws the boxes, decides the hard negatives</div><div class="cell auto">pre-labels, group reservations, model judges in a separate cohort</div></div>
+      <div class="row"><div class="ph">MODEL</div><div class="cell agent">conversion, grouped splits, training scripts, provenance, zero-shot pilots</div><div class="cell human">picks the boring baseline, sets gate thresholds</div><div class="cell auto">overfit gate, run folders that refuse to overwrite</div></div>
+      <div class="row"><div class="ph">EVAL</div><div class="cell agent">metrics, error buckets, ground truth beside prediction, honest labels on results</div><div class="cell human">chooses the operating point, decides which misses cost money</div><div class="cell auto">held-out splits, leakage checks, null instead of invented numbers</div></div>
+      <div class="row"><div class="ph">IMPROVE</div><div class="cell agent">hypothesis, change, retrain, report</div><div class="cell human">approves hypotheses, owns the stop condition</div><div class="cell auto">overnight laps inside the guardrails, morning report</div></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>The framework in one table.</b> Read it by column. The agent column is mostly building and running. The human column is mostly defining and judging. The automate column is what you get once the rules from the human column are written down and the tooling from the agent column exists.</p><p>If you take one thing home: every human cell is a sentence you can write into a plan file before the agent starts.</p></aside>
+</section>
+
+<!-- 18 · Three habits -->
+<section class="slide" id="slide-18">
+  <header class="s-head"><span class="kicker">Takeaway</span><h2>Three habits that made it work.</h2></header>
+  <div class="s-body one">
+    <div class="habits">
+      <div class="habit" data-step="1"><h3>Rules</h3><p>A short file of imperatives the agent reads every session. The strongest ones say what not to do.</p><div class="ex">Do not fabricate source review decisions or real evaluation annotations.</div></div>
+      <div class="habit" data-step="2"><h3>Gates</h3><p>Every milestone ends where a person looks, or where a check must pass. Make the check code when you can.</p><div class="ex">overfit_gate: runs/fixture-overfit-001/overfit_gate.json<br>Need 50 genuinely reviewed real images; found 0</div></div>
+      <div class="habit" data-step="3"><h3>Handoffs</h3><p>The agent ends each session by rewriting the start of the next one: state, counts, the exact next command.</p><div class="ex">Fresh-session handoff — start here.<br>92 completed: 12 positives, 80 negatives.<br>Minimum met. Next: export, then evaluate.</div></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Rules.</b> AGENTS.md is about twenty lines. The lines that did the most work were the prohibitions: do not fabricate, do not treat uncertain as clean, do not scale before the overfit test.</p><p><b>Gates.</b> Milestone one ended with a contact sheet I had to approve. Milestone three ended with a numeric gate the code enforces. Milestone four ends with fifty reviewed real images, and the exporter counts them.</p><p><b>Handoffs.</b> Long projects outlive any single session. The handoff section in PLAN.md is rewritten at the end of every session with current counts and the next command to run. The next session starts there, with no memory needed.</p></aside>
+</section>
+
+<!-- 19 · Where it breaks -->
+<section class="slide" id="slide-19">
+  <header class="s-head"><span class="kicker">Limitations</span><h2>Where delegation breaks.</h2></header>
+  <div class="s-body one">
+    <div class="cautions">
+      <div class="caution" data-step="1"><h3>Can't define good</h3><p>It will optimize whatever you wrote down. If "good enough" is not written, it does not exist.</p></div>
+      <div class="caution y" data-step="2"><h3>Over-builds</h3><p>Ask for a labeling page, get atomic saves, backups, file locks and a 41 KB plan. Say how small.</p></div>
+      <div class="caution" data-step="3"><h3>Sees less than you</h3><p>It can inspect a contact sheet. It cannot know that phone cases are overrepresented in your catalog.</p></div>
+      <div class="caution y" data-step="4"><h3>Drifts over sessions</h3><p>No memory between sessions. Without a handoff it rediscovers, repeats, or quietly changes scope.</p></div>
+      <div class="caution" data-step="5"><h3>Wants to please</h3><p>Left alone it would have invented clean sources on day one. The rule file is what stopped it.</p></div>
+      <div class="caution y" data-step="6"><h3>Compute is real</h3><p>It can start a 50-epoch run as easily as a unit test. Gates and small subsets keep that cheap.</p></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Be honest about the limits.</b> The agent cannot tell you what good is. It over-builds unless you bound the scope. It does not see your data the way you do, which is why the contact sheets exist. It forgets between sessions, so handoffs matter. It is agreeable by default, so the prohibitions matter. And it can spend your GPU hours without noticing, so the gates and the tiny subsets matter.</p><p>None of these are reasons not to use it. They are the reasons the human column in the table is not empty.</p></aside>
+</section>
+
+<!-- 20 · Close -->
+<section class="slide close" id="slide-20">
+  <div class="s-body one">
+    <div>
+      <span class="kicker">Thank you</span>
+      <h1>Agents move the loop.<br><em>You set the criteria.</em></h1>
+      <p class="links"><b>[repo link]</b> · the synthetic generator, labeling tool, gate and evaluator<br><b>[your handle]</b> · questions, and the real-data lap when it runs</p>
+    </div>
+  </div>
+  <aside class="notes"><p><b>Close.</b> Everything shown runs locally with Python and uv. The next lap for this project is the real one: synthetic data from the reviewed sources, the gate, real evaluation on the labeled images.</p><p>Questions.</p></aside>
+</section>
+
+</div>
+<div id="bar"></div>
+<div id="counter">1 / 20</div>
+<div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
+</div></div>
+<div id="notes" hidden></div>
+
+<script>
+(() => {
+  const deck = document.querySelector('.deck-inner');
+  const stage = document.querySelector('.stage');
+  const slides = [...document.querySelectorAll('.slide')];
+  const total = slides.length;
+  const counter = document.getElementById('counter');
+  const bar = document.getElementById('bar');
+  const notesPanel = document.getElementById('notes');
+  const help = document.getElementById('help');
+  const phases = [['explore','Explore'],['label','Label'],['model','Model'],['eval','Eval'],['improve','Improve']];
+  let cur = 0, step = 0;
+
+  slides.forEach(s => {
+    const ph = s.dataset.phase; if (!ph) return;
+    const nav = document.createElement('nav'); nav.className = 'crumb'; nav.setAttribute('aria-label', 'Phase');
+    phases.forEach(([k, name]) => { const b = document.createElement('span'); b.textContent = name; if (k === ph) b.className = 'on'; nav.appendChild(b); });
+    s.querySelector('.s-head').appendChild(nav);
+  });
+
+  const grid = document.getElementById('tiles');
+  if (grid) {
+    let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let k = 0; k < 240; k++) {
+      const t = document.createElement('i');
+      t.style.setProperty('--d', (k * 5) + 'ms');
+      t.style.setProperty('--h', Math.floor(rnd() * 360));
+      t.style.setProperty('--l', (48 + rnd() * 34).toFixed(0) + '%');
+      grid.insertBefore(t, grid.firstChild);
+    }
+  }
+
+  const fit = () => { const s = Math.min(deck.clientWidth / 1600, deck.clientHeight / 900); stage.style.transform = `translate(-50%,-50%) scale(${s})`; };
+  addEventListener('resize', fit); fit();
+
+  const maxStep = s => { let m = 0; s.querySelectorAll('[data-step]').forEach(e => { m = Math.max(m, +e.dataset.step || 0); }); return m; };
+  const runCounters = s => {
+    s.querySelectorAll('[data-count]').forEach(el => {
+      const host = el.closest('[data-step]');
+      if (!host || !host.classList.contains('shown') || el.dataset.done) return;
+      el.dataset.done = '1';
+      const end = +el.dataset.count, t0 = performance.now(), dur = 1000;
+      const tick = now => { const p = Math.min(1, (now - t0) / dur); el.textContent = Math.round(end * (1 - Math.pow(1 - p, 3))).toLocaleString(); if (p < 1) requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    });
+  };
+  const apply = (s, n) => {
+    s.querySelectorAll('[data-step]').forEach(e => { const k = +e.dataset.step; e.classList.toggle('shown', k <= n); e.classList.toggle('now', k === n); });
+    runCounters(s);
+  };
+
+  const show = (n, st) => {
+    n = Math.max(0, Math.min(total - 1, n)); cur = n; step = st == null ? 0 : st;
+    slides.forEach((s, k) => { s.classList.toggle('active', k === cur); s.classList.toggle('past', k < cur); });
+    apply(slides[cur], step);
+    counter.textContent = `${cur + 1} / ${total}`;
+    bar.style.width = (cur / (total - 1) * 100) + '%';
+    const notes = slides[cur].querySelector('.notes');
+    notesPanel.innerHTML = notes ? notes.innerHTML : '';
+    const h = '#slide-' + (cur + 1);
+    if (location.hash !== h) { try { history.replaceState(null, '', h); } catch (_) { location.hash = h; } }
+  };
+  const next = () => { if (step < maxStep(slides[cur])) { step++; apply(slides[cur], step); } else if (cur < total - 1) show(cur + 1, 0); };
+  const prev = () => { if (step > 0) { step--; apply(slides[cur], step); } else if (cur > 0) show(cur - 1, maxStep(slides[cur - 1])); };
+  const fromHash = () => { const m = /^#slide-(\d+)$/.exec(location.hash); return m ? Math.min(total, Math.max(1, +m[1])) - 1 : 0; };
+  addEventListener('hashchange', () => { const n = fromHash(); if (n !== cur) show(n, 0); });
+
+  const toggleNotes = () => {
+    notesPanel.hidden = !notesPanel.hidden;
+    document.body.classList.toggle('with-notes', !notesPanel.hidden);
+    fit();
+    try { localStorage.setItem('deck-notes', notesPanel.hidden ? '0' : '1'); } catch (_) {}
+  };
+  const toggleFull = () => {
+    const d = document.documentElement;
+    if (document.fullscreenElement) { document.exitFullscreen?.(); }
+    else { const p = d.requestFullscreen?.(); if (p && p.catch) p.catch(() => {}); }
+  };
+
+  addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': case 'Enter': e.preventDefault(); next(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace': e.preventDefault(); prev(); break;
+      case 'Home': e.preventDefault(); show(0, 0); break;
+      case 'End': e.preventDefault(); show(total - 1, maxStep(slides[total - 1])); break;
+      case 'n': case 'N': toggleNotes(); break;
+      case 'f': case 'F': toggleFull(); break;
+      case '?': case 'h': case 'H': help.hidden = !help.hidden; break;
+      case 'Escape': help.hidden = true; break;
+    }
+  });
+  deck.addEventListener('click', e => {
+    if (e.target.closest('a, button')) return;
+    if (!help.hidden) { help.hidden = true; return; }
+    (e.clientX < innerWidth * 0.2 ? prev : next)();
+  });
+  let tx = null;
+  addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
+  addEventListener('touchend', e => { if (tx == null) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 40) (dx < 0 ? next : prev)(); tx = null; });
+
+  try { if (localStorage.getItem('deck-notes') === '1') { notesPanel.hidden = false; document.body.classList.add('with-notes'); fit(); } } catch (_) {}
+  show(fromHash(), 0);
+})();
+</script>
+<!-- artifact:end -->
+</body>
+</html>
