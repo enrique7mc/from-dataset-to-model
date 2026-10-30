@@ -33,9 +33,30 @@ Everything lives in `index.html`:
 
 Placeholder to fill in before the talk: `[your handle]` on the closing slide.
 
-To push a local edit to the published copy, ask Claude Code to republish
-`index.html` to the artifact URL; the publish strips the wrapper outside the
-`artifact:start` / `artifact:end` markers.
+### Editing the published copy
+
+The deck is published as a Claude artifact:
+<https://claude.ai/artifact/NVxFLenKPvNe4YMEssQJtv>. There, anyone with edit
+access can press `E` (or the Edit button, bottom left) to edit slide text and
+speaker notes in place. Edited blocks get an orange outline; Save publishes a
+new version of the artifact. Enter is blocked inside a block; Shift+Enter adds
+a line break. SVG labels, layout and builds are not editable there.
+
+To bring those edits back into the repo, read the artifact's HTML to a file and run:
+
+```sh
+python3 -I tools/sync_from_artifact.py artifact.html index.html
+```
+
+It patches only the text blocks that changed and leaves the rest of
+`index.html` untouched. If the slide structure differs between the two files,
+it stops instead of guessing. The rule for what counts as an editable block
+lives both in the `deck-capture` script and in the sync script; change both
+together.
+
+To push a local edit to the published copy, republish the part of
+`index.html` between the `artifact:start` / `artifact:end` markers to the same
+artifact URL, with `assets/` alongside.
 
 ## Assets
 
