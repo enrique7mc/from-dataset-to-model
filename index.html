@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Lato:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<style>
+<style id="deck-css">
 /* Layout: one fixed 1600x900 stage scaled to the viewport. One <section> per slide. [data-step] elements build in on each keypress. */
 @font-face{font-family:"Anton Local";src:url("assets/fonts/Anton-Regular.ttf") format("truetype");font-display:swap}
 @font-face{font-family:"Lato Local";src:url("assets/fonts/Lato-Regular.ttf") format("truetype");font-weight:400;font-display:swap}
@@ -276,6 +276,21 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
 #help div{background:var(--bg-2);border:1px solid var(--line);border-radius:14px;padding:26px 32px;font:400 16px/2 var(--mono);color:var(--fg-2)}
 #help kbd{display:inline-block;min-width:28px;padding:0 8px;margin-right:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg-3);color:var(--fg);text-align:center}
 .notes{display:none}
+
+/* Edit mode (published artifact only): text becomes contenteditable, all builds show, Save republishes the page. */
+body.editing .slide.active [data-step]{opacity:1;transform:none}
+body.editing [contenteditable]{cursor:text;outline:1px dashed rgba(255,207,50,.28);outline-offset:4px;border-radius:2px}
+body.editing [contenteditable]:hover{outline-color:rgba(255,207,50,.6)}
+body.editing [contenteditable]:focus{outline:2px solid var(--yellow)}
+body.editing [contenteditable].dirty{outline-color:var(--orange)}
+#edit-bar{position:fixed;left:max(14px,env(safe-area-inset-left,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:20;display:flex;align-items:center;gap:6px;padding:6px;background:var(--bg-2);border:1px solid var(--line);border-radius:999px;font:400 13px/1 var(--mono);color:var(--muted)}
+body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
+#edit-bar button{font:700 13px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--bg-3);color:var(--fg);cursor:pointer}
+#edit-bar button:hover{border-color:var(--muted)}
+#edit-bar button.primary{background:var(--yellow);border-color:var(--yellow);color:var(--ink)}
+#edit-bar button:disabled{opacity:.45;cursor:default}
+#edit-bar .msg{padding:0 8px;white-space:nowrap}
+#edit-bar .msg:empty{display:none}
 :focus-visible{outline:2px solid var(--yellow);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}.loop .mover{display:none}}
 </style>
@@ -892,11 +907,32 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
 </div>
 <div id="bar"></div>
 <div id="counter">1 / 20</div>
-<div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
+<div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>E</kbd> edit text (published copy)<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
 </div></div>
 <div id="notes" hidden></div>
 
-<script>
+<script id="deck-capture">
+// Runs before the deck script touches the DOM: keeps a pristine copy of the page and the list of editable text blocks.
+// The same rule lives in tools/sync_from_artifact.py; keep the two in step.
+(() => {
+  const TEXT = new Set(['H1','H2','H3','H4','P','LI','TD','TH','FIGCAPTION','BLOCKQUOTE','SMALL']);
+  const editables = root => {
+    const out = [];
+    const walk = (el, inside) => {
+      for (const c of el.children) {
+        if (c.namespaceURI !== 'http://www.w3.org/1999/xhtml' || c.tagName === 'SCRIPT' || c.tagName === 'STYLE') continue;
+        const hit = !inside && (TEXT.has(c.tagName) || [...c.childNodes].some(n => n.nodeType === 3 && /\S/.test(n.data)));
+        if (hit) out.push(c);
+        walk(c, inside || hit);
+      }
+    };
+    root.querySelectorAll('section.slide').forEach(s => walk(s, false));
+    return out;
+  };
+  window.__deck = { editables, pristine: document.body.cloneNode(true), live: editables(document) };
+})();
+</script>
+<script id="deck-main">
 (() => {
   const deck = document.querySelector('.deck-inner');
   const stage = document.querySelector('.stage');
@@ -977,6 +1013,7 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
 
   addEventListener('keydown', e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.isContentEditable || e.target.closest?.('#edit-bar')) return;
     switch (e.key) {
       case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': case 'Enter': e.preventDefault(); next(); break;
       case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace': e.preventDefault(); prev(); break;
@@ -989,16 +1026,149 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
     }
   });
   deck.addEventListener('click', e => {
-    if (e.target.closest('a, button')) return;
+    if (e.target.closest('a, button') || document.body.classList.contains('editing')) return;
     if (!help.hidden) { help.hidden = true; return; }
     (e.clientX < innerWidth * 0.2 ? prev : next)();
   });
   let tx = null;
   addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, { passive: true });
-  addEventListener('touchend', e => { if (tx == null) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 40) (dx < 0 ? next : prev)(); tx = null; });
+  addEventListener('touchend', e => { if (tx == null || document.body.classList.contains('editing')) return; const dx = e.changedTouches[0].clientX - tx; if (Math.abs(dx) > 40) (dx < 0 ? next : prev)(); tx = null; });
 
   try { if (localStorage.getItem('deck-notes') === '1') { notesPanel.hidden = false; document.body.classList.add('with-notes'); fit(); } } catch (_) {}
   show(fromHash(), 0);
+})();
+</script>
+<script id="deck-edit">
+// Edit mode. Only lights up on the published artifact, for viewers who can write it.
+// Save rebuilds the page from the pristine copy plus the edited blocks, never from the live DOM.
+(async () => {
+  const D = window.__deck;
+  const art = await window.claude?.use?.('artifact');
+  if (!D || !art) return;
+  const user = await window.claude.use('user');
+  if (user && !(await user.canEdit().catch(() => true))) return;
+  const STASH = 'deck-unsaved-edits';
+  const live = D.live, saved = D.editables(D.pristine);
+  if (saved.length !== live.length) return;
+  const dirty = new Set();
+  let editing = false, busy = false, readOnly = false;
+
+  const bar = document.createElement('div');
+  bar.id = 'edit-bar';
+  bar.innerHTML = '<button type="button" data-a="toggle">Edit</button><span class="msg" role="status"></span><button type="button" class="primary" data-a="save" hidden>Save</button><button type="button" data-a="discard" hidden>Discard</button>';
+  document.body.appendChild(bar);
+  const btn = a => bar.querySelector(`[data-a="${a}"]`);
+  const msg = bar.querySelector('.msg');
+  const notesPanel = document.getElementById('notes');
+
+  const clean = el => {
+    const c = el.cloneNode(true);
+    c.querySelectorAll('*').forEach(n => {
+      n.removeAttribute('contenteditable'); n.removeAttribute('spellcheck'); n.removeAttribute('data-done');
+      n.classList.remove('shown', 'now', 'dirty');
+      if (n.getAttribute('class') === '') n.removeAttribute('class');
+    });
+    return c.innerHTML;
+  };
+  const stash = () => {
+    const edits = {}; dirty.forEach(i => { edits[i] = clean(live[i]); });
+    try { dirty.size ? sessionStorage.setItem(STASH, JSON.stringify(edits)) : sessionStorage.removeItem(STASH); } catch (_) {}
+    return edits;
+  };
+  const render = (note) => {
+    btn('toggle').textContent = editing ? 'Done' : 'Edit';
+    btn('toggle').hidden = readOnly;
+    btn('save').hidden = btn('discard').hidden = !editing || !dirty.size;
+    btn('save').disabled = btn('discard').disabled = busy;
+    msg.textContent = note ?? (readOnly ? 'View only' : dirty.size ? `${dirty.size} unsaved` : editing ? 'Click any text to edit' : '');
+  };
+  const mark = i => { dirty.add(i); live[i].classList.add('dirty'); stash(); render(); };
+
+  const setNotesEditable = () => notesPanel.querySelectorAll('p').forEach(p => { p.contentEditable = editing ? 'true' : 'false'; if (!editing) p.removeAttribute('contenteditable'); });
+  new MutationObserver(setNotesEditable).observe(notesPanel, { childList: true });
+
+  const setEditing = on => {
+    editing = on && !readOnly;
+    document.body.classList.toggle('editing', editing);
+    live.forEach(el => { if (editing) { el.contentEditable = 'true'; el.spellcheck = true; } else { el.removeAttribute('contenteditable'); el.removeAttribute('spellcheck'); } });
+    setNotesEditable();
+    if (!editing && document.activeElement?.isContentEditable) document.activeElement.blur();
+    render();
+  };
+
+  live.forEach((el, i) => el.addEventListener('input', () => mark(i)));
+  notesPanel.addEventListener('input', e => {
+    const p = e.target.closest('p'); if (!p) return;
+    const aside = document.querySelector('.slide.active .notes'); if (!aside) return;
+    const k = [...notesPanel.querySelectorAll('p')].indexOf(p);
+    const target = aside.querySelectorAll('p')[k]; if (!target) return;
+    target.innerHTML = p.innerHTML;
+    const i = live.findIndex(el => el === target || el.contains(target));
+    if (i >= 0) mark(i);
+  });
+  document.addEventListener('paste', e => {
+    if (!e.target.isContentEditable) return;
+    e.preventDefault();
+    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+  });
+  document.addEventListener('keydown', e => {
+    if (e.target.isContentEditable) {
+      if (e.key === 'Enter') { e.preventDefault(); if (e.shiftKey) document.execCommand('insertLineBreak'); }
+      if (e.key === 'Escape') e.target.blur();
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('#edit-bar')) return;
+    if (e.key === 'e' || e.key === 'E') setEditing(!editing);
+  });
+
+  const buildDoc = () => {
+    const reset = document.head.querySelector('style')?.textContent || '';
+    const keep = 'title, meta[name="claude:viewport-fit-sides"], link[href*="fonts.g"], style#deck-css, .deck, #notes';
+    const parts = [...D.pristine.children].filter(n => n.matches(keep)).map(n => n.outerHTML);
+    ['deck-capture', 'deck-main', 'deck-edit'].forEach(id => { const s = document.getElementById(id); if (s) parts.push(s.outerHTML); });
+    return '<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>' + reset + '</style></head><body>' + parts.join('\n') + '\n</body></html>';
+  };
+  const save = async () => {
+    if (busy || !dirty.size) return;
+    busy = true; render('Saving…');
+    const edits = stash();
+    Object.entries(edits).forEach(([i, h]) => { saved[i].innerHTML = h; });
+    const html = buildDoc();
+    try {
+      try { await art.publish({ 'index.html': html }); }
+      catch (e) { if (e?.code === 'capability_disabled') await art.publish(html); else throw e; }
+      dirty.forEach(i => live[i].classList.remove('dirty'));
+      dirty.clear(); stash(); busy = false; render('Saved');
+    } catch (e) {
+      busy = false;
+      const code = e?.code;
+      if (code === 'not_writer' || code === 'not_granted' || code === 'consent_required' || code === 'not_declared' || code === 'capability_removed') { readOnly = true; setEditing(false); return; }
+      render(code === 'conflict' ? 'Someone saved first. Reloading, your edits come back' :
+        code === 'rate_limited' ? 'Saving too often. Wait a minute, then Save' :
+        code === 'too_large' ? 'Page is over the size limit' : 'Could not save. Try Save again');
+    }
+  };
+  const discard = () => {
+    dirty.forEach(i => { live[i].innerHTML = saved[i].innerHTML; live[i].classList.remove('dirty'); });
+    dirty.clear(); stash();
+    const aside = document.querySelector('.slide.active .notes');
+    if (aside && !notesPanel.hidden) notesPanel.innerHTML = aside.innerHTML;
+    render();
+  };
+  bar.addEventListener('click', e => {
+    const a = e.target.closest('button')?.dataset.a;
+    if (a === 'toggle') setEditing(!editing);
+    else if (a === 'save') save();
+    else if (a === 'discard') discard();
+  });
+
+  let restored = 0;
+  try {
+    const edits = JSON.parse(sessionStorage.getItem(STASH) || '{}');
+    Object.entries(edits).forEach(([i, h]) => { if (live[i] && clean(live[i]) !== h) { live[i].innerHTML = h; dirty.add(+i); live[i].classList.add('dirty'); restored++; } });
+    if (!restored) sessionStorage.removeItem(STASH);
+  } catch (_) {}
+  if (restored) { setEditing(true); render(`Restored ${restored} unsaved`); } else render();
 })();
 </script>
 <!-- artifact:end -->
