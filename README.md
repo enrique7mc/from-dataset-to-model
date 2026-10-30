@@ -31,8 +31,7 @@ Everything lives in `index.html`:
 - `data-phase="explore|label|model|eval|improve"` on a section adds the
   pipeline breadcrumb in the header.
 
-Placeholders to fill in before the talk: `[repo link]` and `[your handle]` on the
-closing slide.
+Placeholder to fill in before the talk: `[your handle]` on the closing slide.
 
 To push a local edit to the published copy, ask Claude Code to republish
 `index.html` to the artifact URL; the publish strips the wrapper outside the
