@@ -1,7 +1,7 @@
 # From Dataset to Model
 
 Slide deck for the Claude Code meetup talk *From Dataset to Model: ML Development
-with Coding Agents*. Twenty-one slides, one HTML file, no build step.
+with Coding Agents*. Twenty-two slides, one HTML file, no build step.
 
 ## Present
 

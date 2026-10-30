@@ -252,6 +252,13 @@ svg .drop,svg .pop,svg .anim,svg .auto-drop,svg .auto-pop{transform-box:fill-box
 .habit p{margin:0;font:400 21px/1.35 var(--body);color:var(--fg-2)}
 .habit .ex{margin-top:auto;padding:12px 14px;background:var(--paper);color:var(--ink);border-radius:8px;font:400 15px/1.45 var(--mono)}
 
+/* Team tools */
+.tools{display:flex;flex-direction:column;gap:26px;justify-content:center;min-height:0}
+.tools .habits{grid-template-columns:repeat(4,1fr);align-content:stretch}
+.tools .habit{padding:24px 24px}
+.tools .habit h3{font-size:34px}
+.tools .habit p{font-size:20px}
+
 /* Cautions */
 .cautions{display:grid;grid-template-columns:repeat(3,1fr);gap:30px 34px;align-content:center;padding:10px 20px}
 .caution{background:var(--red);color:var(--fg);border-radius:16px;padding:24px 26px;box-shadow:0 14px 34px rgba(0,0,0,.35)}
@@ -630,8 +637,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
       <div class="quote" data-step="4">Minimum met. Zero reviewed examples for promo_badge, watermark_logo and banner_ribbon. Prioritize those next, and vary product types so phone cases do not dominate.<b>agent · handoff note, read from the live state of the tool</b></div>
     </div>
     <div class="who">
-      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Refused to mark anything clean or draw a single box. The rule said so.</p></div>
-      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>One evening of real labels. Every record carries my handle and the image hash.</p></div>
+      <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Refused to mark anything clean or invent labels because of the rules.</p></div>
+      <div class="role human" data-step="3"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Labels by hand and provides confidence to the training data.</p></div>
       <div class="role auto" data-step="5"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Next: pre-label with the current model, humans verify. Judge with a second model against independent references.</p></div>
     </div>
   </div>
@@ -702,8 +709,8 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     </div>
     <div class="who">
       <div class="role human" data-step="1"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Set the thresholds. If the pipeline cannot overfit a handful of images, nothing downstream means anything.</p></div>
-      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The gate is code, not a checklist. It records checkpoint and dataset hashes.</p></div>
-      <div class="role agent" data-step="3"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Only after the pass: a 20-epoch grouped baseline on 100 / 40 / 20 images. Results were weak (mAP@0.5 0.55, recall 0.43), and the agent's report says so.</p></div>
+      <div class="role auto" data-step="2"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>The gate is defined in code for fast verification. It records checkpoint and dataset hashes.</p></div>
+      <div class="role agent" data-step="3"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Only after the pass: a 20-epoch grouped baseline on 100 / 40 / 20 images. Results were weak (mAP@0.5 0.55, recall 0.43).</p></div>
     </div>
   </div>
   <aside class="notes"><p><b>The tiny overfit test.</b> Before any real training run, take 64 images, point validation at the same 64, switch off augmentation, and train until the model memorizes them. If mAP, precision and recall do not all clear 0.90, the pipeline is broken somewhere: labels, conversion, class ids, image size.</p><p><b>What is unusual here</b> is that the agent made the gate structural. The baseline config points at the gate file. If the gate is missing, failed, or its hashes do not match the current checkpoint and dataset, training refuses to start. A rule in AGENTS.md became a check in code.</p><p><b>The baseline itself</b> is a short 20-epoch YOLOv8n run on illustrated fixtures. Validation mAP@0.5 was 0.55 with recall 0.43. The agent's own report calls it weak. That honesty matters later.</p></aside>
@@ -735,7 +742,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
     <div class="stack">
       <div class="hgroup cost" data-step="1"><h4>Cost to score 100M images<small>log scale · batch prices · Gemini tokens estimated</small></h4><div class="hbars"><div class="hbar" style="--v:.976"><span>Gemini 3.1 Pro</span><div class="track"><div class="fill"></div></div><span class="num">$760k</span></div><div class="hbar" style="--v:.856"><span>Gemini 3 Flash</span><div class="track"><div class="fill"></div></div><span class="num">$190k</span></div><div class="hbar" style="--v:.627"><span>pilot VLM, full</span><div class="track"><div class="fill"></div></div><span class="num">$14k</span></div><div class="hbar" style="--v:.509"><span>pilot VLM, yes/no</span><div class="track"><div class="fill"></div></div><span class="num">$3.5k</span></div><div class="hbar hi" style="--v:.14"><span>own YOLOv8n</span><div class="track"><div class="fill"></div></div><span class="num">~$50</span></div></div></div>
       <div class="hgroup cost tier" data-step="2"><h4>Tiered · 100M images<small>share of images · routed by confidence · ≈ $23k total</small></h4><div class="hbars"><div class="hbar hi" style="--v:1"><span>own detector</span><div class="track"><div class="fill"></div></div><span class="num">100%</span></div><div class="hbar" style="--v:.03"><span>Gemini 3.1 Pro</span><div class="track"><div class="fill"></div></div><span class="num">3%</span></div><div class="hbar muted" style="--v:.0005"><span>human review</span><div class="track"><div class="fill"></div></div><span class="num">0.05%</span></div></div></div>
-      <div class="takeaway" data-step="3">Own the bulk. <em>Rent the hard tail.</em></div>
+      <div class="takeaway" data-step="3">Cheap model always runs.&nbsp;<em>Pay extra for&nbsp;the hard tail.</em></div>
     </div>
     <div class="who">
       <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Read token counts from the pilot's 53 cached calls, then sent the 36 images a single yes/no question: 838 tokens, $0.000035 each.</p></div>
@@ -857,11 +864,11 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
         </g>
         <circle class="mover" r="10"><animateMotion dur="9s" repeatCount="indefinite" rotate="auto"><mpath href="#orbit"/></animateMotion></circle>
       </svg>
-      <div class="nextlist" data-step="4"><b>next for this project ›</b> generate ABO synthetic from the 294 clean sources · overfit gate again · real evaluation on the 92 labeled images · RPC packaging-text negatives</div>
+      <div class="nextlist" data-step="4"><b>next lap ›</b> <b>hypothesis:</b> fixtures don't look like real catalogs → <b>change:</b> synthesize on 294 real photos → <b>gate:</b> overfit again → <b>eval:</b> 92 hand-labeled images</div>
     </div>
     <div class="who">
       <div class="role agent" data-step="1"><span class="tag"><svg><use href="#i-agent"/></svg>Agent</span><p>Runs the inner loop: read buckets, propose a change, retrain, re-evaluate, write the report.</p></div>
-      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Approves hypotheses. Owns the stop condition. Looks at every new contact sheet.</p></div>
+      <div class="role human" data-step="2"><span class="tag"><svg><use href="#i-human"/></svg>Human</span><p>Approves hypotheses. Owns the stop condition. Looks at every new review sheet.</p></div>
       <div class="role auto" data-step="3"><span class="tag"><svg><use href="#i-auto"/></svg>Automate</span><p>Let it run a few iterations overnight inside the guardrails. Read the morning report.</p></div>
     </div>
   </div>
@@ -884,8 +891,25 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>The framework in one table.</b> Read it by column. The agent column is mostly building and running. The human column is mostly defining and judging. The automate column is what you get once the rules from the human column are written down and the tooling from the agent column exists.</p><p>If you take one thing home: every human cell is a sentence you can write into a plan file before the agent starts.</p></aside>
 </section>
 
-<!-- 19 · Three habits -->
+<!-- 19 · Team tools -->
 <section class="slide" id="slide-19">
+  <header class="s-head"><span class="kicker">Beyond this project</span><h2>What happens as the workflow matures.</h2></header>
+  <div class="s-body one">
+    <div class="tools">
+      <div class="habits">
+        <div class="habit" data-step="1"><h3>Labeling UI</h3><p>The review page one person needed becomes the tool everyone labels in. Same keys, same negatives list, every project.</p><div class="ex">label --queue new-batch</div></div>
+        <div class="habit" data-step="2"><h3>Data access MCP</h3><p>People and agents pull data through one shared server instead of each writing their own downloader.</p><div class="ex">sample_images(n=500)</div></div>
+        <div class="habit" data-step="3"><h3>LLM judge CLI</h3><p>Send the inference and a grading prompt. An LLM grades it. Anyone can score a model run without building a grader.</p><div class="ex">judge --inference preds.jsonl<br>&nbsp;&nbsp;--prompt rubric.md<br>→ grade + reason per item</div></div>
+        <div class="habit" data-step="4"><h3>Golden dataset</h3><p>Small, frozen, labeled by people. Every model change runs against it first. Quick, and you trust the result.</p><div class="ex">golden-v3 · frozen<br>never trained on<br>rerun on every change</div></div>
+      </div>
+      <div class="takeaway" data-step="5">An agent builds the tool once. <em>The whole team uses it.</em></div>
+    </div>
+  </div>
+  <aside class="notes"><p><b>From my day job.</b> This project is one person and one model. In a team, the same loop runs over and over, and the tools the agent builds along the way stop being one-offs. They get standardized, and every new project starts with them already in place.</p><p><b>Labeling UI and data access.</b> The labeling tool on slide 8 was built for this project. Once a team has one, everyone labels the same way with the same negatives. An MCP server for data access means a person or an agent asks for a sample instead of writing another downloader.</p><p><b>The judge.</b> A command-line LLM judge: you pass the model's inference and a grading prompt, and an LLM returns a grade and a reason. It is the grading page from slide 12 turned into a tool anyone can run.</p><p><b>The golden dataset.</b> A small, frozen, human-labeled set that every model change is checked against before anything else. It is fast because it is small, and trustworthy because people labeled it and it is never used for training. The 92 labeled images in this project are the start of one.</p><p><b>Why agents change the math.</b> Internal tools used to lose the priority fight. With an agent, building one costs an afternoon, so building it for the whole team pays off much sooner.</p></aside>
+</section>
+
+<!-- 20 · Three habits -->
+<section class="slide" id="slide-20">
   <header class="s-head"><span class="kicker">Takeaway</span><h2>Three habits that made it work.</h2></header>
   <div class="s-body one">
     <div class="habits">
@@ -897,29 +921,29 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
   <aside class="notes"><p><b>Rules.</b> AGENTS.md is about twenty lines. The lines that did the most work were the prohibitions: do not fabricate, do not treat uncertain as clean, do not scale before the overfit test.</p><p><b>Gates.</b> Milestone one ended with a contact sheet I had to approve. Milestone three ended with a numeric gate the code enforces. Milestone four ends with fifty reviewed real images, and the exporter counts them.</p><p><b>Handoffs.</b> Long projects outlive any single session. The handoff section in PLAN.md is rewritten at the end of every session with current counts and the next command to run. The next session starts there, with no memory needed.</p></aside>
 </section>
 
-<!-- 20 · Where it breaks -->
-<section class="slide" id="slide-20">
+<!-- 21 · Where it breaks -->
+<section class="slide" id="slide-21">
   <header class="s-head"><span class="kicker">Limitations</span><h2>Where delegation breaks.</h2></header>
   <div class="s-body one">
     <div class="cautions">
       <div class="caution" data-step="1"><h3>Can't define good</h3><p>It will optimize whatever you wrote down. If "good enough" is not written, it does not exist.</p></div>
-      <div class="caution y" data-step="2"><h3>Over-builds</h3><p>Ask for a labeling page, get atomic saves, backups, file locks and a 41 KB plan. Say how small.</p></div>
+      <div class="caution y" data-step="2"><h3>Over-builds</h3><p>Ask for a labeling page, get atomic saves, backups, file locks and a 41 KB plan. Say how small is the task.</p></div>
       <div class="caution" data-step="3"><h3>Sees less than you</h3><p>It can inspect a contact sheet. It cannot know that phone cases are overrepresented in your catalog.</p></div>
       <div class="caution y" data-step="4"><h3>Drifts over sessions</h3><p>No memory between sessions. Without a handoff it rediscovers, repeats, or quietly changes scope.</p></div>
       <div class="caution" data-step="5"><h3>Wants to please</h3><p>Left alone it would have invented clean sources on day one. The rule file is what stopped it.</p></div>
-      <div class="caution y" data-step="6"><h3>Compute is real</h3><p>It can start a 50-epoch run as easily as a unit test. Gates and small subsets keep that cheap.</p></div>
+      <div class="caution y" data-step="6"><h3>Compute is real</h3><p>It launches a long training run as casually as a test. Make it prove the pipeline on 64 images first.</p></div>
     </div>
   </div>
   <aside class="notes"><p><b>Be honest about the limits.</b> The agent cannot tell you what good is. It over-builds unless you bound the scope. It does not see your data the way you do, which is why the contact sheets exist. It forgets between sessions, so handoffs matter. It is agreeable by default, so the prohibitions matter. And it can spend your GPU hours without noticing, so the gates and the tiny subsets matter.</p><p>None of these are reasons not to use it. They are the reasons the human column in the table is not empty.</p></aside>
 </section>
 
-<!-- 21 · Close -->
-<section class="slide close" id="slide-21">
+<!-- 22 · Close -->
+<section class="slide close" id="slide-22">
   <div class="s-body one">
     <div>
       <span class="kicker">Thank you</span>
       <h1>Agents move the loop.<br><em>You set the criteria.</em></h1>
-      <p class="links"><b><a href="https://github.com/enrique7mc/from-dataset-to-model" target="_blank" rel="noopener" style="color:inherit">github.com/enrique7mc/from-dataset-to-model</a></b> · this deck<br><b>[your handle]</b> · questions, and the real-data lap when it runs</p>
+      <p class="links"><b><a href="https://github.com/enrique7mc/from-dataset-to-model" target="_blank" rel="noopener" style="color:inherit">github.com/enrique7mc/from-dataset-to-model</a></b> · this deck<br><b>linkedin.com/in/enrique7mc</b>&nbsp;· questions &amp; feedback</p>
     </div>
   </div>
   <aside class="notes"><p><b>Close.</b> Everything shown runs locally with Python and uv. The next lap for this project is the real one: synthetic data from the reviewed sources, the gate, real evaluation on the labeled images.</p><p>Questions.</p></aside>
@@ -927,7 +951,7 @@ body.with-notes #edit-bar{bottom:calc(224px + env(safe-area-inset-bottom,0px))}
 
 </div>
 <div id="bar"></div>
-<div id="counter">1 / 21</div>
+<div id="counter">1 / 22</div>
 <div id="help" hidden><div><kbd>→</kbd> next build or slide<br><kbd>←</kbd> previous<br><kbd>Home</kbd> first slide &nbsp; <kbd>End</kbd> last slide<br><kbd>N</kbd> toggle speaker notes<br><kbd>F</kbd> fullscreen<br><kbd>E</kbd> edit text (published copy)<br><kbd>?</kbd> this help &nbsp; <kbd>Esc</kbd> close</div></div>
 </div></div>
 <div id="notes" hidden></div>
